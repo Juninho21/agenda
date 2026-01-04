@@ -59,24 +59,32 @@
   position: absolute;
   top: 2rem;
   right: 2rem;
-  background: var(--bg-element);
-  border: 2px solid var(--accent-color);
+  background: transparent;
+  /* Transparent default */
+  border: none;
+  /* No border */
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
+  width: 45px;
+  height: 45px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--accent-color);
-  font-size: 1.5rem;
+  color: var(--text-secondary);
+  /* Subtle grey color */
+  font-size: 2rem;
   transition: all 0.3s;
   z-index: 100;
+  opacity: 0.5;
+  /* Low opacity by default */
 }
 
 .theme-toggle:hover {
-  background-color: var(--accent-color);
-  color: var(--bg-element);
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  /* Brighten on hover */
+  opacity: 1;
+  transform: rotate(15deg);
 }
 
 .navigate-date {
