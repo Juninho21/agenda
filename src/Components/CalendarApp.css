@@ -167,6 +167,25 @@
   color: var(--text-secondary);
   cursor: pointer;
   text-shadow: 0 0 0.5rem 1rem rgba(0, 0, 0, 0.2);
+  position: relative;
+}
+
+.event-count {
+  position: absolute;
+  top: 10%;
+  right: 15%;
+  background-color: #ff5252;
+  color: #fff;
+  border-radius: 50%;
+  width: 1.8rem;
+  height: 1.8rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.2rem;
+  font-weight: bold;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+  z-index: 10;
 }
 
 .days span:hover:not(.current-day) {
@@ -181,6 +200,20 @@
   box-shadow: 0 0 1.5rem 1rem rgba(var(--accent-rgb), 0.3);
 }
 
+.selected-day {
+  border: 2px solid var(--accent-color);
+  border-radius: 50%;
+  color: var(--accent-color);
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.2);
+}
+
+.selected-day.current-day {
+  background-color: var(--accent-color);
+  color: #fff;
+  border: none;
+  box-shadow: 0 0 1.5rem 1rem rgba(var(--accent-rgb), 0.4);
+}
+
 .events {
   width: 60%;
   height: 100%;
@@ -192,11 +225,36 @@
   display: none;
 }
 
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
 .event-popup {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
   background-color: var(--bg-element);
   width: clamp(310px, 90%, 400px);
   border-radius: 12px;
@@ -204,14 +262,37 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  z-index: 1000;
   padding: 0;
   max-width: 95vw;
+  animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes popupFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -60%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
 }
 
 .event-popup-header {
   background-color: var(--accent-color);
-  /* User asked to keep system colors. This is accent. */
   padding: 20px 24px;
   display: flex;
   flex-direction: column;
@@ -241,17 +322,18 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  /* Time on right as per print */
 }
 
 .header-time span {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: all 0.2s;
 }
 
 .header-time span.active-time {
   opacity: 1;
+  transform: scale(1.1);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
 }
 
 .clock-container {
@@ -266,14 +348,14 @@
   width: 260px;
   height: 260px;
   border-radius: 50%;
-  background-color: var(--clock-face);
+  background: var(--clock-face);
   position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
   font-family: 'Roboto', sans-serif;
   transform: scale(1);
-  /* Default scale */
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.2);
 }
 
 .center-point {
@@ -306,6 +388,7 @@
   background-color: var(--accent-color);
   border-radius: 50%;
   z-index: -1;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
 }
 
 .clock-number {
@@ -318,12 +401,10 @@
   border-radius: 50%;
   cursor: pointer;
   font-size: 1.8rem;
-  /* Increased from 1.4rem */
   color: var(--text-primary);
   user-select: none;
   z-index: 10;
   transition: transform 0.1s, background-color 0.2s;
-  /* Above hand */
 }
 
 .clock-number:active {
@@ -333,28 +414,34 @@
 
 .clock-number.inner {
   font-size: 1.5rem;
-  /* Increased from 1.2rem */
   color: var(--text-secondary);
 }
 
 .clock-number.selected {
   color: #fff;
-  /* Keep selected white for contrast against orange hand */
 }
 
 .popup-text-input {
   width: calc(100% - 48px);
   margin: 15px 24px;
-  padding: 10px;
-  border: none;
-  border-bottom: 2px solid var(--accent-color);
-  background: transparent;
+  padding: 12px 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
   font-family: 'Roboto', sans-serif;
   font-size: 1.4rem;
   margin-bottom: 15px;
   resize: none;
-  height: 40px;
+  height: 46px;
   color: var(--text-primary);
+  transition: all 0.3s;
+}
+
+.popup-text-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  background: rgba(var(--accent-rgb), 0.05);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.2);
 }
 
 .popup-text-input::placeholder {
@@ -638,6 +725,49 @@
 
   .clock-container {
     padding: 10px;
-    /* Reduce padding to fit */
   }
+}
+
+.events {
+  position: relative;
+}
+
+.events-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2rem 2rem 2rem;
+  width: 100%;
+}
+
+.event-list-title {
+  font-family: "Roboto", sans-serif;
+  font-size: 2.5rem;
+  color: var(--text-primary);
+}
+
+.add-event-btn {
+  background-color: var(--accent-color);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 1.4rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+  box-shadow: 0 4px 10px rgba(var(--accent-rgb), 0.3);
+}
+
+.add-event-btn:hover {
+  background-color: var(--accent-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(var(--accent-rgb), 0.4);
+}
+
+.add-event-btn:active {
+  transform: translateY(0);
 }

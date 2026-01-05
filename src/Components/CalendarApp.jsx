@@ -49,7 +49,6 @@ const CalendarApp = () => {
     const today = new Date();
     if (clickedDate >= today || isSameDay(clickedDate, today)) {
       setSelectedDate(clickedDate);
-      setShowEventPopup(true);
       setEventTime({ hours: "00", minutes: "00" });
       setEventText("");
       setEditingEvent(null);
@@ -92,7 +91,9 @@ const CalendarApp = () => {
     });
     setEventText(event.text);
     setEditingEvent(event);
+    setEditingEvent(event);
     setShowEventPopup(true);
+    setTimePickerMode("hours");
   };
 
   const handleDeleteEvent = (eventId) => {
@@ -159,25 +160,67 @@ const CalendarApp = () => {
           {[...Array(firstDayOfMonth).keys()].map((_, index) => (
             <span key={`empty-${index}`} />
           ))}
-          {[...Array(daysInMonth).keys()].map((day) => (
-            <span
-              key={day + 1}
-              className={
-                day + 1 === currentDate.getDate() &&
-                  currentMonth === currentDate.getMonth() &&
-                  currentYear === currentDate.getFullYear()
-                  ? "current-day"
-                  : ""
-              }
-              onClick={() => handleDayClick(day + 1)}
-            >
-              {day + 1}
-            </span>
-          ))}
+          {[...Array(daysInMonth).keys()].map((day) => {
+            const dateToCheck = new Date(currentYear, currentMonth, day + 1);
+            const eventCount = events.filter((event) =>
+              isSameDay(event.date, dateToCheck)
+            ).length;
+
+            return (
+              <span
+                key={day + 1}
+                className={
+                  `${isSameDay(dateToCheck, currentDate) ? "current-day " : ""
+                  }${isSameDay(dateToCheck, selectedDate) ? "selected-day" : ""
+                  }`
+                }
+                onClick={() => handleDayClick(day + 1)}
+              >
+                {day + 1}
+                {eventCount > 0 && (
+                  <div className="event-count">{eventCount}</div>
+                )}
+              </span>
+            );
+          })}
         </div>
       </div>
       <div className="events">
-        {showEventPopup && (
+        <div className="events-header">
+          <h3 className="event-list-title">
+            {selectedDate.getDate()} de {monthOfYear[selectedDate.getMonth()]}
+          </h3>
+          <button className="add-event-btn" onClick={() => {
+            setShowEventPopup(true);
+            setTimePickerMode("hours");
+          }}>
+            <i className="bx bx-plus"></i> Agendar
+          </button>
+        </div>
+
+        {events.filter((event) => isSameDay(event.date, selectedDate)).map((event, index) => (
+          <div className="event" key={index}>
+            <div className="event-date-wrapper">
+              <div className="event-date">{`${event.date.getDate()} de ${monthOfYear[event.date.getMonth()]
+                } de ${event.date.getFullYear()}`}</div>
+              <div className="event-time">{event.time}</div>
+            </div>
+            <div className="event-text">{event.text}</div>
+            <div className="event-buttons">
+              <i
+                className="bx bxs-edit-alt"
+                onClick={() => handleEditEvent(event)}
+              ></i>
+              <i
+                className="bx bxs-message-alt-x"
+                onClick={() => handleDeleteEvent(event.id)}
+              ></i>
+            </div>
+          </div>
+        ))}
+      </div>
+      {showEventPopup && (
+        <div className="modal-overlay">
           <div className="event-popup">
             <div className="event-popup-header">
               <div className="header-year">{selectedDate.getFullYear()}</div>
@@ -243,6 +286,7 @@ const CalendarApp = () => {
                           }}
                           onClick={() => {
                             setEventTime(prev => ({ ...prev, hours: hour.toString().padStart(2, "0") }));
+                            setTimePickerMode("minutes");
                           }}
                         >
                           {hour}
@@ -263,6 +307,7 @@ const CalendarApp = () => {
                           }}
                           onClick={() => {
                             setEventTime(prev => ({ ...prev, hours: actualHour.toString().padStart(2, "0") }));
+                            setTimePickerMode("minutes");
                           }}
                         >
                           {actualHour === 0 ? "00" : actualHour}
@@ -313,28 +358,8 @@ const CalendarApp = () => {
             </div>
 
           </div>
-        )}
-        {events.map((event, index) => (
-          <div className="event" key={index}>
-            <div className="event-date-wrapper">
-              <div className="event-date">{`${event.date.getDate()} de ${monthOfYear[event.date.getMonth()]
-                } de ${event.date.getFullYear()}`}</div>
-              <div className="event-time">{event.time}</div>
-            </div>
-            <div className="event-text">{event.text}</div>
-            <div className="event-buttons">
-              <i
-                className="bx bxs-edit-alt"
-                onClick={() => handleEditEvent(event)}
-              ></i>
-              <i
-                className="bx bxs-message-alt-x"
-                onClick={() => handleDeleteEvent(event.id)}
-              ></i>
-            </div>
-          </div>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
