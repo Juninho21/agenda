@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const CalendarApp = () => {
   const dayOfWeek = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -116,6 +116,86 @@ const CalendarApp = () => {
       date1.getDate() === date2.getDate()
     );
   };
+
+  const clockRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const calculateTimeFromAngle = (clientX, clientY, mode) => {
+    if (!clockRef.current) return;
+    const rect = clockRef.current.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = clientX - cx;
+    const dy = clientY - cy;
+
+    // Angle in degrees, 0 at 12 o'clock
+    let angle = Math.atan2(dy, dx) * (180 / Math.PI) + 90;
+    if (angle < 0) angle += 360;
+
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (mode === "hours") {
+      const hourIndex = Math.round(angle / 30) % 12;
+      const isInner = dist < 82; // Threshold between inner (66px) and outer (98px)
+
+      let hour;
+      if (isInner) {
+        if (hourIndex === 0) hour = 0; // Top position inner is 00
+        else hour = hourIndex + 12; // e.g. 1 -> 13
+      } else {
+        if (hourIndex === 0) hour = 12; // Top position outer is 12
+        else hour = hourIndex;
+      }
+      setEventTime(prev => ({ ...prev, hours: hour.toString().padStart(2, "0") }));
+    } else {
+      // Minutes - snap to minute (6 degrees)
+      const minute = Math.round(angle / 6) % 60;
+      setEventTime(prev => ({ ...prev, minutes: minute.toString().padStart(2, "0") }));
+    }
+  };
+
+  const handlePointerDown = (e) => {
+    setIsDragging(true);
+    // e.preventDefault() prevents text selection and browser default touch actions (scrolling)
+    // Note: 'touch-action: none' in CSS handles the scrolling part mostly, but preventDefault is good for mouse selection.
+    if (e.cancelable) e.preventDefault();
+
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    calculateTimeFromAngle(clientX, clientY, timePickerMode);
+  };
+
+  useEffect(() => {
+    const handleGlobalMove = (e) => {
+      if (!isDragging) return;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      calculateTimeFromAngle(clientX, clientY, timePickerMode);
+    };
+
+    const handleGlobalUp = () => {
+      if (isDragging) {
+        setIsDragging(false);
+        if (timePickerMode === "hours") {
+          setTimePickerMode("minutes");
+        }
+      }
+    };
+
+    if (isDragging) {
+      window.addEventListener("mousemove", handleGlobalMove);
+      window.addEventListener("mouseup", handleGlobalUp);
+      window.addEventListener("touchmove", handleGlobalMove, { passive: false });
+      window.addEventListener("touchend", handleGlobalUp);
+    }
+
+    return () => {
+      window.removeEventListener("mousemove", handleGlobalMove);
+      window.removeEventListener("mouseup", handleGlobalUp);
+      window.removeEventListener("touchmove", handleGlobalMove);
+      window.removeEventListener("touchend", handleGlobalUp);
+    };
+  }, [isDragging, timePickerMode]);
 
   console.log(daysInMonth, firstDayOfMonth);
   console.log(currentMonth, currentYear, currentDate);
@@ -246,7 +326,12 @@ const CalendarApp = () => {
             </div>
 
             <div className="clock-container">
-              <div className="clock-face">
+              <div
+                className="clock-face"
+                ref={clockRef}
+                onMouseDown={handlePointerDown}
+                onTouchStart={handlePointerDown}
+              >
                 <div className="center-point"></div>
                 {/* Clock Hand */}
                 {/* Clock Hand */}
@@ -284,10 +369,6 @@ const CalendarApp = () => {
                           style={{
                             transform: `rotate(${angle}deg) translate(0, -98px) rotate(-${angle}deg)`,
                           }}
-                          onClick={() => {
-                            setEventTime(prev => ({ ...prev, hours: hour.toString().padStart(2, "0") }));
-                            setTimePickerMode("minutes");
-                          }}
                         >
                           {hour}
                         </div>
@@ -304,10 +385,6 @@ const CalendarApp = () => {
                             }`}
                           style={{
                             transform: `rotate(${rot}deg) translate(0, -66px) rotate(-${rot}deg)`,
-                          }}
-                          onClick={() => {
-                            setEventTime(prev => ({ ...prev, hours: actualHour.toString().padStart(2, "0") }));
-                            setTimePickerMode("minutes");
                           }}
                         >
                           {actualHour === 0 ? "00" : actualHour}
@@ -329,9 +406,6 @@ const CalendarApp = () => {
                           }`}
                         style={{
                           transform: `rotate(${angle}deg) translate(0, -98px) rotate(-${angle}deg)`,
-                        }}
-                        onClick={() => {
-                          setEventTime(prev => ({ ...prev, minutes: minute.toString().padStart(2, "0") }));
                         }}
                       >
                         {minute.toString().padStart(2, "0")}
