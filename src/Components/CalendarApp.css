@@ -103,7 +103,7 @@
 }
 
 .navigate-date h2 {
-  font-size: clamp(1.5rem, 1.5cqi, 2.5rem);
+  font-size: clamp(1.5rem, 2cqi, 3rem);
   color: var(--text-secondary);
   padding-left: 1.3rem;
 }
@@ -747,7 +747,7 @@
 
 .events-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   padding: 0 2rem 2rem 2rem;
   width: 100%;

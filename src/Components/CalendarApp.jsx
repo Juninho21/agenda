@@ -28,6 +28,14 @@ const CalendarApp = () => {
   const [eventText, setEventText] = useState("");
   const [editingEvent, setEditingEvent] = useState(null);
   const [timePickerMode, setTimePickerMode] = useState("hours"); // 'hours' or 'minutes'
+  const [currentSystemTime, setCurrentSystemTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSystemTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
@@ -224,8 +232,9 @@ const CalendarApp = () => {
           <i className={`bx ${theme === 'dark' ? 'bx-sun' : 'bx-moon'}`}></i>
         </button>
         <div className="navigate-date">
-          <h2 className="month">{monthOfYear[currentMonth]},</h2>
-          <h2 className="year">{currentYear}</h2>
+          <h2 className="month">
+            {currentSystemTime.toLocaleDateString('pt-BR', { weekday: 'long' }).charAt(0).toUpperCase() + currentSystemTime.toLocaleDateString('pt-BR', { weekday: 'long' }).slice(1)}, {currentSystemTime.getDate()} de {monthOfYear[currentSystemTime.getMonth()]} de {currentSystemTime.getFullYear()}, {currentSystemTime.toLocaleTimeString('pt-BR')}
+          </h2>
           <div className="buttons">
             <i className="bx bx-chevron-left" onClick={prevMonth}></i>
             <i className="bx bx-chevron-right" onClick={nextMonth}></i>
@@ -267,9 +276,7 @@ const CalendarApp = () => {
       </div>
       <div className="events">
         <div className="events-header">
-          <h3 className="event-list-title">
-            {selectedDate.getDate()} de {monthOfYear[selectedDate.getMonth()]}
-          </h3>
+
           <button className="add-event-btn" onClick={() => {
             setShowEventPopup(true);
             setTimePickerMode("hours");
