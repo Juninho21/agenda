@@ -684,6 +684,17 @@
     padding: 1rem;
   }
 
+  .event-count {
+    width: 1.8rem;
+    height: 1.8rem;
+    font-size: 1rem;
+    top: 0;
+    right: 0;
+    padding: 0;
+    border: 2px solid var(--bg-color);
+    /* Separate from day number if overlap occurs */
+  }
+
   .event-popup {
     width: 100%;
     height: 100%;
