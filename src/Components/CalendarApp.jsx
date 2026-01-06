@@ -22,13 +22,19 @@ const CalendarApp = () => {
   const [currentYear, setCurrentYear] = useState(currentDate.getFullYear());
   const [selectedDate, setSelectedDate] = useState(currentDate);
   const [showEventPopup, setShowEventPopup] = useState(false);
+  const [showAlertDialog, setShowAlertDialog] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
   const [events, setEvents] = useState([]);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
-  const [eventTime, setEventTime] = useState({ hours: "00", minutes: "00" });
+  const [eventStartTime, setEventStartTime] = useState({ hours: "00", minutes: "00" });
+  const [eventEndTime, setEventEndTime] = useState({ hours: "01", minutes: "00" });
+  const [activeTimeField, setActiveTimeField] = useState("start"); // 'start' or 'end'
   const [eventText, setEventText] = useState("");
   const [editingEvent, setEditingEvent] = useState(null);
   const [timePickerMode, setTimePickerMode] = useState("hours"); // 'hours' or 'minutes'
   const [currentSystemTime, setCurrentSystemTime] = useState(new Date());
+
+  const currentEventTime = activeTimeField === 'start' ? eventStartTime : eventEndTime;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -57,20 +63,85 @@ const CalendarApp = () => {
     const today = new Date();
     if (clickedDate >= today || isSameDay(clickedDate, today)) {
       setSelectedDate(clickedDate);
-      setEventTime({ hours: "00", minutes: "00" });
+      setEventStartTime({ hours: "00", minutes: "00" });
+      setEventEndTime({ hours: "01", minutes: "00" });
       setEventText("");
       setEditingEvent(null);
+      setActiveTimeField("start");
     }
   };
 
   const handleEventSubmit = () => {
+    const startStr = `${eventStartTime.hours.padStart(2, "0")}:${eventStartTime.minutes.padStart(2, "0")}`;
+    const endStr = `${eventEndTime.hours.padStart(2, "0")}:${eventEndTime.minutes.padStart(2, "0")}`;
+
+    const appointmentDate = new Date(selectedDate);
+    appointmentDate.setHours(parseInt(eventStartTime.hours), parseInt(eventStartTime.minutes), 0, 0);
+
+    const currentDateTime = new Date();
+    if (appointmentDate < new Date(currentDateTime.setSeconds(0, 0))) {
+      setAlertMessage("Não é possível criar agendamentos no passado.");
+      setShowAlertDialog(true);
+      return;
+    }
+
+    const startMinutes = parseInt(eventStartTime.hours) * 60 + parseInt(eventStartTime.minutes);
+    const endMinutes = parseInt(eventEndTime.hours) * 60 + parseInt(eventEndTime.minutes);
+
+    // Standard check: 00:00 to 01:00 is technically start=0, end=60. 
+    // This is NOT overnight (60 > 0), so it bypasses the overnight check below and is treated as a normal morning event.
+
+    // Check if end time is valid
+    // If end > start: Normal case.
+    // If end <= start: Overnight case.
+    // To distinguish "Mistake" (e.g. 14:00 -> 13:00) from "Overnight" (23:00 -> 01:00),
+    // we limit overnight duration to a "reasonable" shift length, e.g., 16 hours.
+
+    if (endMinutes <= startMinutes) {
+      const overnightDuration = (endMinutes + 1440) - startMinutes;
+      if (overnightDuration > 600) { // 10 hours limit for overnight inference
+        setAlertMessage("O horário final não pode ser anterior ao inicial.");
+        setShowAlertDialog(true);
+        return;
+      }
+    }
+
+    // Allow overnight
+    const isOvernight = endMinutes <= startMinutes;
+    const effectiveEndMinutes = isOvernight ? endMinutes + 1440 : endMinutes;
+
+    const hasOverlap = events.some(event => {
+      if (editingEvent && event.id === editingEvent.id) return false;
+      if (!isSameDay(event.date, selectedDate)) return false;
+
+      const evStart = event.startTime || event.time;
+      const evEnd = event.endTime || event.startTime || event.time;
+
+      const evStartMinutes = parseInt(evStart.split(":")[0]) * 60 + parseInt(evStart.split(":")[1]);
+      let evEndMinutes = parseInt(evEnd.split(":")[0]) * 60 + parseInt(evEnd.split(":")[1]);
+
+      // If event end <= start, it spans to next day
+      if (evEndMinutes <= evStartMinutes) {
+        evEndMinutes += 1440;
+      }
+
+      const effectiveEvEnd = evEndMinutes === evStartMinutes ? evStartMinutes + 60 : evEndMinutes;
+
+      return startMinutes < effectiveEvEnd && effectiveEndMinutes > evStartMinutes;
+    });
+
+    if (hasOverlap) {
+      setAlertMessage("Já existe um agendamento nesse horário.");
+      setShowAlertDialog(true);
+      return;
+    }
+
     const newEvent = {
       id: editingEvent ? editingEvent.id : Date.now(),
       date: selectedDate,
-      time: `${eventTime.hours.padStart(2, "0")}:${eventTime.minutes.padStart(
-        2,
-        "0"
-      )}`,
+      startTime: startStr,
+      endTime: endStr,
+      time: startStr, // Keep for backward compat if needed
       text: eventText,
     };
 
@@ -85,23 +156,37 @@ const CalendarApp = () => {
     updatedEvents.sort((a, b) => new Date(a.date) - new Date(b.date));
 
     setEvents(updatedEvents);
-    setEventTime({ hours: "00", minutes: "00" });
+    setEventStartTime({ hours: "00", minutes: "00" });
+    setEventEndTime({ hours: "01", minutes: "00" });
     setEventText("");
     setShowEventPopup(false);
     setEditingEvent(null);
+    setActiveTimeField("start");
   };
 
   const handleEditEvent = (event) => {
     setSelectedDate(new Date(event.date));
-    setEventTime({
-      hours: event.time.split(":")[0],
-      minutes: event.time.split(":")[1],
+
+    const startT = event.startTime || event.time;
+    const endT = event.endTime || event.time; // Fallback for legacy
+
+    setEventStartTime({
+      hours: startT.split(":")[0],
+      minutes: startT.split(":")[1],
     });
+
+    // For end time, if legacy, maybe default to start + 1 or same? 
+    // If same, validation might fail on save, but user can edit.
+    setEventEndTime({
+      hours: endT.split(":")[0],
+      minutes: endT.split(":")[1],
+    });
+
     setEventText(event.text);
-    setEditingEvent(event);
     setEditingEvent(event);
     setShowEventPopup(true);
     setTimePickerMode("hours");
+    setActiveTimeField("start");
   };
 
   const handleDeleteEvent = (eventId) => {
@@ -144,21 +229,51 @@ const CalendarApp = () => {
 
     if (mode === "hours") {
       const hourIndex = Math.round(angle / 30) % 12;
-      const isInner = dist < 82; // Threshold between inner (66px) and outer (98px)
+      const isInner = dist < 82;
 
       let hour;
       if (isInner) {
-        if (hourIndex === 0) hour = 0; // Top position inner is 00
-        else hour = hourIndex + 12; // e.g. 1 -> 13
+        if (hourIndex === 0) hour = 0;
+        else hour = hourIndex + 12;
       } else {
-        if (hourIndex === 0) hour = 12; // Top position outer is 12
+        if (hourIndex === 0) hour = 12;
         else hour = hourIndex;
       }
-      setEventTime(prev => ({ ...prev, hours: hour.toString().padStart(2, "0") }));
+
+      const val = hour.toString().padStart(2, "0");
+      if (activeTimeField === 'start') {
+        setEventStartTime(prev => {
+          const newStart = { ...prev, hours: val };
+          // Auto update end time to start + 1h
+          const nextHour = (parseInt(val) + 1) % 24;
+          setEventEndTime({
+            hours: nextHour.toString().padStart(2, "0"),
+            minutes: newStart.minutes
+          });
+          return newStart;
+        });
+      } else {
+        setEventEndTime(prev => ({ ...prev, hours: val }));
+      }
     } else {
-      // Minutes - snap to minute (6 degrees)
+      // Minutes
       const minute = Math.round(angle / 6) % 60;
-      setEventTime(prev => ({ ...prev, minutes: minute.toString().padStart(2, "0") }));
+      const val = minute.toString().padStart(2, "0");
+
+      if (activeTimeField === 'start') {
+        setEventStartTime(prev => {
+          const newStart = { ...prev, minutes: val };
+          // Auto update end time to match minutes, keeping 1h diff
+          const endHour = (parseInt(newStart.hours) + 1) % 24;
+          setEventEndTime({
+            hours: endHour.toString().padStart(2, "0"),
+            minutes: val
+          });
+          return newStart;
+        });
+      } else {
+        setEventEndTime(prev => ({ ...prev, minutes: val }));
+      }
     }
   };
 
@@ -233,7 +348,7 @@ const CalendarApp = () => {
         </button>
         <div className="navigate-date">
           <h2 className="month">
-            {currentSystemTime.toLocaleDateString('pt-BR', { weekday: 'long' }).charAt(0).toUpperCase() + currentSystemTime.toLocaleDateString('pt-BR', { weekday: 'long' }).slice(1)}, {currentSystemTime.getDate()} de {monthOfYear[currentSystemTime.getMonth()]} de {currentSystemTime.getFullYear()}, {currentSystemTime.toLocaleTimeString('pt-BR')}
+            {monthOfYear[currentMonth]} {currentYear}
           </h2>
           <div className="buttons">
             <i className="bx bx-chevron-left" onClick={prevMonth}></i>
@@ -290,7 +405,9 @@ const CalendarApp = () => {
             <div className="event-date-wrapper">
               <div className="event-date">{`${event.date.getDate()} de ${monthOfYear[event.date.getMonth()]
                 } de ${event.date.getFullYear()}`}</div>
-              <div className="event-time">{event.time}</div>
+              <div className="event-time">
+                {event.startTime || event.time} - {event.endTime || (event.startTime ? parseInt(event.startTime.split(':')[0]) + 1 + ':' + event.startTime.split(':')[1] : '')}
+              </div>
             </div>
             <div className="event-text">{event.text}</div>
             <div className="event-buttons">
@@ -310,25 +427,52 @@ const CalendarApp = () => {
         <div className="modal-overlay">
           <div className="event-popup">
             <div className="event-popup-header">
-              <div className="header-year">{selectedDate.getFullYear()}</div>
               <div className="header-date">
-                {`${dayOfWeek[selectedDate.getDay()]}, ${selectedDate.getDate()} ${monthOfYear[selectedDate.getMonth()].slice(0, 3)
-                  }`}
+                {selectedDate.toLocaleDateString('pt-BR', { weekday: 'long' }).charAt(0).toUpperCase() + selectedDate.toLocaleDateString('pt-BR', { weekday: 'long' }).slice(1)}, {selectedDate.getDate()} de {monthOfYear[selectedDate.getMonth()]} de {selectedDate.getFullYear()}
               </div>
-              <div className="header-time">
-                <span
-                  className={timePickerMode === "hours" ? "active-time" : ""}
-                  onClick={() => setTimePickerMode("hours")}
+              <div className="header-time-section">
+                <div
+                  className={`time-selector ${activeTimeField === 'start' ? 'active' : ''}`}
+                  onClick={() => setActiveTimeField('start')}
                 >
-                  {eventTime.hours}
-                </span>
-                :
-                <span
-                  className={timePickerMode === "minutes" ? "active-time" : ""}
-                  onClick={() => setTimePickerMode("minutes")}
+                  <label>Início</label>
+                  <div className="time-display">
+                    <span
+                      className={activeTimeField === 'start' && timePickerMode === "hours" ? "active-time" : ""}
+                      onClick={(e) => { e.stopPropagation(); setActiveTimeField('start'); setTimePickerMode("hours"); }}
+                    >
+                      {eventStartTime.hours}
+                    </span>
+                    :
+                    <span
+                      className={activeTimeField === 'start' && timePickerMode === "minutes" ? "active-time" : ""}
+                      onClick={(e) => { e.stopPropagation(); setActiveTimeField('start'); setTimePickerMode("minutes"); }}
+                    >
+                      {eventStartTime.minutes}
+                    </span>
+                  </div>
+                </div>
+                <div
+                  className={`time-selector ${activeTimeField === 'end' ? 'active' : ''}`}
+                  onClick={() => setActiveTimeField('end')}
                 >
-                  {eventTime.minutes}
-                </span>
+                  <label>Fim</label>
+                  <div className="time-display">
+                    <span
+                      className={activeTimeField === 'end' && timePickerMode === "hours" ? "active-time" : ""}
+                      onClick={(e) => { e.stopPropagation(); setActiveTimeField('end'); setTimePickerMode("hours"); }}
+                    >
+                      {eventEndTime.hours}
+                    </span>
+                    :
+                    <span
+                      className={activeTimeField === 'end' && timePickerMode === "minutes" ? "active-time" : ""}
+                      onClick={(e) => { e.stopPropagation(); setActiveTimeField('end'); setTimePickerMode("minutes"); }}
+                    >
+                      {eventEndTime.minutes}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -346,14 +490,14 @@ const CalendarApp = () => {
                   className="clock-hand"
                   style={{
                     transform: `rotate(${timePickerMode === "hours"
-                      ? (parseInt(eventTime.hours) % 12) * 30
-                      : parseInt(eventTime.minutes) * 6
+                      ? (parseInt(currentEventTime.hours) % 12) * 30
+                      : parseInt(currentEventTime.minutes) * 6
                       }deg)`,
                     height:
                       timePickerMode === "minutes"
                         ? "98px" // Matches outer ring radius approx
                         : (
-                          (parseInt(eventTime.hours) > 12 || parseInt(eventTime.hours) === 0)
+                          (parseInt(currentEventTime.hours) > 12 || parseInt(currentEventTime.hours) === 0)
                             ? "66px" // Inner radius
                             : "98px" // Outer radius
                         ),
@@ -369,7 +513,7 @@ const CalendarApp = () => {
                       return (
                         <div
                           key={`h-${hour}`}
-                          className={`clock-number outer ${parseInt(eventTime.hours) === hour
+                          className={`clock-number outer ${parseInt(currentEventTime.hours) === hour
                             ? "selected"
                             : ""
                             }`}
@@ -388,7 +532,7 @@ const CalendarApp = () => {
                       return (
                         <div
                           key={`h-in-${actualHour}`}
-                          className={`clock-number inner ${parseInt(eventTime.hours) === actualHour ? "selected" : ""
+                          className={`clock-number inner ${parseInt(currentEventTime.hours) === actualHour ? "selected" : ""
                             }`}
                           style={{
                             transform: `rotate(${rot}deg) translate(0, -66px) rotate(-${rot}deg)`,
@@ -409,7 +553,7 @@ const CalendarApp = () => {
                     return (
                       <div
                         key={`m-${minute}`}
-                        className={`clock-number outer ${Math.abs(parseInt(eventTime.minutes) - minute) < 5 ? "selected" : ""
+                        className={`clock-number outer ${Math.abs(parseInt(currentEventTime.minutes) - minute) < 5 ? "selected" : ""
                           }`}
                         style={{
                           transform: `rotate(${angle}deg) translate(0, -98px) rotate(-${angle}deg)`,
@@ -438,6 +582,17 @@ const CalendarApp = () => {
               <button className="ok-btn" onClick={handleEventSubmit}>OK</button>
             </div>
 
+          </div>
+        </div>
+      )}
+      {showAlertDialog && (
+        <div className="modal-overlay">
+          <div className="alert-popup">
+            <div className="alert-icon">
+              <i className='bx bx-error-circle'></i>
+            </div>
+            <div className="alert-message">{alertMessage}</div>
+            <button className="alert-ok-btn" onClick={() => setShowAlertDialog(false)}>OK</button>
           </div>
         </div>
       )}

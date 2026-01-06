@@ -784,3 +784,112 @@
 .add-event-btn:active {
   transform: translateY(0);
 }
+
+.alert-popup {
+  background-color: var(--bg-element);
+  width: clamp(300px, 80%, 400px);
+  border-radius: 12px;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 10px 40px var(--shadow-color);
+  animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.alert-icon {
+  font-size: 5rem;
+  color: #ff5252;
+  margin-bottom: 20px;
+  line-height: 1;
+}
+
+.alert-message {
+  font-size: 1.8rem;
+  color: var(--text-primary);
+  margin-bottom: 30px;
+  font-family: 'Roboto', sans-serif;
+  line-height: 1.4;
+}
+
+.alert-ok-btn {
+  background-color: var(--accent-color);
+  border: none;
+  color: #fff;
+  padding: 12px 40px;
+  border-radius: 8px;
+  font-size: 1.6rem;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+  box-shadow: 0 4px 10px rgba(var(--accent-rgb), 0.3);
+}
+
+.alert-ok-btn:hover {
+  background-color: var(--accent-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(var(--accent-rgb), 0.4);
+}
+
+.alert-ok-btn:active {
+  transform: translateY(0);
+}
+
+/* Time Selector Styles */
+.header-time-section {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding-top: 10px;
+}
+
+.time-selector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-bottom: 2px solid transparent;
+  padding-bottom: 5px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: all 0.3s;
+}
+
+.time-selector.active {
+  border-bottom: 2px solid #fff;
+  opacity: 1;
+}
+
+.time-selector label {
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+  font-family: 'Roboto', sans-serif;
+  font-weight: 500;
+}
+
+.time-display {
+  font-size: 2.5rem;
+  font-weight: bold;
+  font-family: 'Roboto', sans-serif;
+  display: flex;
+  align-items: center;
+}
+
+.time-display span {
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.time-display span.active-time {
+  color: #fff;
+  transform: scale(1.1);
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+}
+
+@media (max-width: 600px) {
+  .header-time-section {
+    justify-content: space-around;
+  }
+}
