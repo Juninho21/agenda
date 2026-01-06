@@ -25,7 +25,7 @@ const CalendarApp = () => {
   const [showAlertDialog, setShowAlertDialog] = useState(false);
   const [alertMessage, setAlertMessage] = useState("");
   const [events, setEvents] = useState([]);
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const [eventStartTime, setEventStartTime] = useState({ hours: "00", minutes: "00" });
   const [eventEndTime, setEventEndTime] = useState({ hours: "01", minutes: "00" });
   const [activeTimeField, setActiveTimeField] = useState("start"); // 'start' or 'end'
@@ -400,28 +400,37 @@ const CalendarApp = () => {
           </button>
         </div>
 
-        {events.filter((event) => isSameDay(event.date, selectedDate)).map((event, index) => (
-          <div className="event" key={index}>
-            <div className="event-date-wrapper">
-              <div className="event-date">{`${event.date.getDate()} de ${monthOfYear[event.date.getMonth()]
-                } de ${event.date.getFullYear()}`}</div>
-              <div className="event-time">
-                {event.startTime || event.time} - {event.endTime || (event.startTime ? parseInt(event.startTime.split(':')[0]) + 1 + ':' + event.startTime.split(':')[1] : '')}
+        {events
+          .filter((event) => isSameDay(event.date, selectedDate))
+          .sort((a, b) => {
+            const timeA = a.startTime || a.time;
+            const timeB = b.startTime || b.time;
+            const minA = parseInt(timeA.split(':')[0]) * 60 + parseInt(timeA.split(':')[1]);
+            const minB = parseInt(timeB.split(':')[0]) * 60 + parseInt(timeB.split(':')[1]);
+            return minA - minB;
+          })
+          .map((event, index) => (
+            <div className="event" key={index}>
+              <div className="event-date-wrapper">
+                <div className="event-date">{`${event.date.getDate()} de ${monthOfYear[event.date.getMonth()]
+                  } de ${event.date.getFullYear()}`}</div>
+                <div className="event-time">
+                  {event.startTime || event.time} - {event.endTime || (event.startTime ? parseInt(event.startTime.split(':')[0]) + 1 + ':' + event.startTime.split(':')[1] : '')}
+                </div>
+              </div>
+              <div className="event-text">{event.text}</div>
+              <div className="event-buttons">
+                <i
+                  className="bx bxs-edit-alt"
+                  onClick={() => handleEditEvent(event)}
+                ></i>
+                <i
+                  className="bx bxs-message-alt-x"
+                  onClick={() => handleDeleteEvent(event.id)}
+                ></i>
               </div>
             </div>
-            <div className="event-text">{event.text}</div>
-            <div className="event-buttons">
-              <i
-                className="bx bxs-edit-alt"
-                onClick={() => handleEditEvent(event)}
-              ></i>
-              <i
-                className="bx bxs-message-alt-x"
-                onClick={() => handleDeleteEvent(event.id)}
-              ></i>
-            </div>
-          </div>
-        ))}
+          ))}
       </div>
       {showEventPopup && (
         <div className="modal-overlay">

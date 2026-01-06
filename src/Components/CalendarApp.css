@@ -65,7 +65,7 @@
 
 .theme-toggle {
   position: absolute;
-  top: 2rem;
+  top: 1rem;
   right: 2rem;
   background: transparent;
   /* Transparent default */
@@ -870,7 +870,7 @@
 }
 
 .time-display {
-  font-size: 2.5rem;
+  font-size: 3.5rem;
   font-weight: bold;
   font-family: 'Roboto', sans-serif;
   display: flex;
