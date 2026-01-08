@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirmação de E-mail</title>
+  <style>
+    /* Reset & Basics */
+    body { margin: 0; padding: 0; background-color: #1e242d; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #ffffff; }
+    table { border-spacing: 0; width: 100%; }
+    td { padding: 0; }
+    img { border: 0; }
+    .wrapper { width: 100%; table-layout: fixed; background-color: #1e242d; padding-bottom: 40px; }
+    .main { background-color: #161b22; margin: 0 auto; width: 100%; max-width: 600px; border-spacing: 0; font-family: sans-serif; color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); }
+    .two-columns { text-align: center; font-size: 0; }
+    .two-columns .column { width: 100%; max-width: 300px; display: inline-block; vertical-align: top; }
+    a { text-decoration: none; color: #007bff; }
+    
+    /* Custom Styling */
+    .header { padding: 40px 20px; text-align: center; background: linear-gradient(180deg, #1f2731 0%, #161b22 100%); border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .logo { font-size: 32px; font-weight: bold; color: #ffffff; letter-spacing: 3px; font-family: 'Impact', 'Arial Black', sans-serif; text-transform: uppercase; }
+    .content { padding: 40px 30px; text-align: center; }
+    .title { font-size: 24px; font-weight: bold; margin-bottom: 10px; color: #ffffff; }
+    .text { font-size: 16px; line-height: 1.6; color: #b0b8c4; margin-bottom: 30px; }
+    .btn { display: inline-block; padding: 16px 32px; background-color: #007bff; color: #ffffff !important; font-weight: bold; border-radius: 8px; text-decoration: none; transition: background-color 0.3s; font-size: 16px; box-shadow: 0 4px 10px rgba(0, 123, 255, 0.3); }
+    .btn:hover { background-color: #0056b3; }
+    .footer { padding: 30px; text-align: center; font-size: 12px; color: #78879e; border-top: 1px solid rgba(255,255,255,0.05); background-color: #1e242d; }
+    
+    /* Utilities */
+    .highlight { color: #007bff; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <table class="main" align="center">
+      <!-- Header -->
+      <tr>
+        <td class="header">
+          <div class="logo">AGENDA</div>
+        </td>
+      </tr>
+
+      <!-- Content -->
+      <tr>
+        <td class="content">
+          <h1 class="title">Confirme seu Cadastro</h1>
+          <p class="text">
+            Olá! Obrigado por se juntar a nós. <br>
+            Estamos quase lá. Para garantir a segurança da sua conta e começar a usar a <strong>Agenda</strong>, por favor confirme seu endereço de e-mail.
+          </p>
+          <p style="margin-bottom: 40px;">
+            <a href="{{ .ConfirmationURL }}" class="btn">Confirmar E-mail</a>
+          </p>
+          <p class="text" style="font-size: 14px; color: #6e7681;">
+            Se o botão acima não funcionar, copie e cole o link abaixo no seu navegador:<br>
+            <span style="color: #007bff; word-break: break-all; font-size: 12px;">{{ .ConfirmationURL }}</span>
+          </p>
+        </td>
+      </tr>
+
+      <!-- Footer -->
+      <tr>
+        <td class="footer">
+          <p>Se você não criou esta conta, pode ignorar este e-mail com segurança.</p>
+          <p>&copy; 2026 Agenda App. Todos os direitos reservados.</p>
+        </td>
+      </tr>
+    </table>
+  </div>
+</body>
+</html>

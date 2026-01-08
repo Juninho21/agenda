@@ -63,10 +63,16 @@
   letter-spacing: 0.3rem;
 }
 
-.theme-toggle {
+.header-controls {
   position: absolute;
   top: 1rem;
   right: 2rem;
+  display: flex;
+  gap: 1rem;
+  z-index: 100;
+}
+
+.theme-toggle {
   background: transparent;
   /* Transparent default */
   border: none;
@@ -82,7 +88,6 @@
   /* Subtle grey color */
   font-size: 2rem;
   transition: all 0.3s;
-  z-index: 100;
   opacity: 0.5;
   /* Low opacity by default */
 }

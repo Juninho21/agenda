@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { supabase } from "../supabaseClient";
 
 const CalendarApp = () => {
   const dayOfWeek = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -58,11 +59,58 @@ const CalendarApp = () => {
       currentMonth === 11 ? prevYear + 1 : prevYear
     );
   };
+  // Fetch events from Supabase
+  // Fetch events from Supabase
+  const fetchEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*');
+
+      if (error) throw error;
+
+      if (data) {
+        // Save to cache
+        localStorage.setItem('cached_events', JSON.stringify(data));
+
+        // Convert date strings back to Date objects for the UI
+        const formattedEvents = data.map(event => ({
+          ...event,
+          date: new Date(event.date + 'T00:00:00') // Ensure local time doesn't shift day
+        }));
+        setEvents(formattedEvents);
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error.message);
+
+      // Try initializing from cache if network fails
+      const cached = localStorage.getItem('cached_events');
+      if (cached) {
+        const data = JSON.parse(cached);
+        const formattedEvents = data.map(event => ({
+          ...event,
+          date: new Date(event.date + 'T00:00:00')
+        }));
+        setEvents(formattedEvents);
+        setAlertMessage("Modo Offline: Exibindo dados salvos localmente.");
+        setShowAlertDialog(true);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
   const handleDayClick = (day) => {
     const clickedDate = new Date(currentYear, currentMonth, day);
     const today = new Date();
-    if (clickedDate >= today || isSameDay(clickedDate, today)) {
-      setSelectedDate(clickedDate);
+    // Reset hours to compare dates only
+    const clickedDateReset = new Date(clickedDate.setHours(0, 0, 0, 0));
+    const todayReset = new Date(today.setHours(0, 0, 0, 0));
+
+    if (clickedDateReset >= todayReset) {
+      setSelectedDate(new Date(currentYear, currentMonth, day));
       setEventStartTime({ hours: "00", minutes: "00" });
       setEventEndTime({ hours: "01", minutes: "00" });
       setEventText("");
@@ -71,7 +119,77 @@ const CalendarApp = () => {
     }
   };
 
-  const handleEventSubmit = () => {
+  // Sync Queue Logic
+  const processSyncQueue = async () => {
+    if (!navigator.onLine) return;
+
+    const queueStr = localStorage.getItem('sync_queue');
+    if (!queueStr) return;
+
+    const queue = JSON.parse(queueStr);
+    if (queue.length === 0) return;
+
+    console.log("Processing sync queue:", queue);
+
+    try {
+      for (const item of queue) {
+        if (item.type === 'INSERT') {
+          // Remove temporary ID and isLocal flag before sending
+          const { id, isLocal, ...eventData } = item.payload;
+          await supabase.from('events').insert([eventData]);
+        } else if (item.type === 'UPDATE') {
+          const { id, isLocal, ...eventData } = item.payload;
+          await supabase.from('events').update(eventData).eq('id', id);
+        } else if (item.type === 'DELETE') {
+          await supabase.from('events').delete().eq('id', item.id);
+        }
+      }
+
+      // Clear queue after success
+      localStorage.removeItem('sync_queue');
+      // Refresh real data
+      await fetchEvents();
+
+    } catch (err) {
+      console.error("Sync error", err);
+      // Keep queue to retry later
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener('online', processSyncQueue);
+    // Try to process on mount if online
+    processSyncQueue();
+    return () => window.removeEventListener('online', processSyncQueue);
+  }, []);
+
+  const addToQueue = (action) => {
+    const queue = JSON.parse(localStorage.getItem('sync_queue') || '[]');
+
+    // Optimization: If we update an event that is currently pending insert, just update the insert payload
+    if (action.type === 'UPDATE') {
+      const pendingInsertIndex = queue.findIndex(q => q.type === 'INSERT' && q.payload.id === action.payload.id);
+      if (pendingInsertIndex >= 0) {
+        queue[pendingInsertIndex].payload = { ...queue[pendingInsertIndex].payload, ...action.payload };
+        localStorage.setItem('sync_queue', JSON.stringify(queue));
+        return;
+      }
+    }
+    // Optimization: If we delete an event pending insert, just remove the insert
+    if (action.type === 'DELETE') {
+      const pendingInsertIndex = queue.findIndex(q => q.type === 'INSERT' && q.payload.id === action.id);
+      if (pendingInsertIndex >= 0) {
+        queue.splice(pendingInsertIndex, 1);
+        localStorage.setItem('sync_queue', JSON.stringify(queue));
+        return;
+      }
+    }
+
+    queue.push(action);
+    localStorage.setItem('sync_queue', JSON.stringify(queue));
+  };
+
+  const handleEventSubmit = async () => {
     const startStr = `${eventStartTime.hours.padStart(2, "0")}:${eventStartTime.minutes.padStart(2, "0")}`;
     const endStr = `${eventEndTime.hours.padStart(2, "0")}:${eventEndTime.minutes.padStart(2, "0")}`;
 
@@ -88,25 +206,15 @@ const CalendarApp = () => {
     const startMinutes = parseInt(eventStartTime.hours) * 60 + parseInt(eventStartTime.minutes);
     const endMinutes = parseInt(eventEndTime.hours) * 60 + parseInt(eventEndTime.minutes);
 
-    // Standard check: 00:00 to 01:00 is technically start=0, end=60. 
-    // This is NOT overnight (60 > 0), so it bypasses the overnight check below and is treated as a normal morning event.
-
-    // Check if end time is valid
-    // If end > start: Normal case.
-    // If end <= start: Overnight case.
-    // To distinguish "Mistake" (e.g. 14:00 -> 13:00) from "Overnight" (23:00 -> 01:00),
-    // we limit overnight duration to a "reasonable" shift length, e.g., 16 hours.
-
     if (endMinutes <= startMinutes) {
       const overnightDuration = (endMinutes + 1440) - startMinutes;
-      if (overnightDuration > 600) { // 10 hours limit for overnight inference
+      if (overnightDuration > 600) {
         setAlertMessage("O horário final não pode ser anterior ao inicial.");
         setShowAlertDialog(true);
         return;
       }
     }
 
-    // Allow overnight
     const isOvernight = endMinutes <= startMinutes;
     const effectiveEndMinutes = isOvernight ? endMinutes + 1440 : endMinutes;
 
@@ -114,17 +222,15 @@ const CalendarApp = () => {
       if (editingEvent && event.id === editingEvent.id) return false;
       if (!isSameDay(event.date, selectedDate)) return false;
 
-      const evStart = event.startTime || event.time;
-      const evEnd = event.endTime || event.startTime || event.time;
+      const evStart = event.start_time || event.startTime || event.time;
+      const evEnd = event.end_time || event.endTime || evStart;
 
       const evStartMinutes = parseInt(evStart.split(":")[0]) * 60 + parseInt(evStart.split(":")[1]);
       let evEndMinutes = parseInt(evEnd.split(":")[0]) * 60 + parseInt(evEnd.split(":")[1]);
 
-      // If event end <= start, it spans to next day
       if (evEndMinutes <= evStartMinutes) {
         evEndMinutes += 1440;
       }
-
       const effectiveEvEnd = evEndMinutes === evStartMinutes ? evStartMinutes + 60 : evEndMinutes;
 
       return startMinutes < effectiveEvEnd && effectiveEndMinutes > evStartMinutes;
@@ -136,26 +242,72 @@ const CalendarApp = () => {
       return;
     }
 
-    const newEvent = {
-      id: editingEvent ? editingEvent.id : Date.now(),
-      date: selectedDate,
-      startTime: startStr,
-      endTime: endStr,
-      time: startStr, // Keep for backward compat if needed
+    const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+
+    const eventData = {
+      date: dateStr,
+      start_time: startStr,
+      end_time: endStr,
       text: eventText,
     };
 
-    let updatedEvents = [...events];
-    if (editingEvent) {
-      updatedEvents = updatedEvents.map((event) =>
-        event.id === editingEvent.id ? newEvent : event
-      );
-    } else {
-      updatedEvents.push(newEvent);
-    }
-    updatedEvents.sort((a, b) => new Date(a.date) - new Date(b.date));
+    // Optimistic Update Logic
+    const eventStateData = { ...eventData, date: new Date(dateStr + 'T00:00:00') };
+    const normalizeForCache = (list) => list.map(ev => ({
+      ...ev,
+      date: ev.date instanceof Date
+        ? `${ev.date.getFullYear()}-${String(ev.date.getMonth() + 1).padStart(2, '0')}-${String(ev.date.getDate()).padStart(2, '0')}`
+        : ev.date
+    }));
 
-    setEvents(updatedEvents);
+    if (editingEvent) {
+      const updatedEvent = { ...editingEvent, ...eventStateData };
+      // Update UI immediately
+      const updatedList = events.map(ev => ev.id === editingEvent.id ? updatedEvent : ev);
+      setEvents(updatedList);
+
+      // Update persistent Cache for offline reloads (Normalize to YYYY-MM-DD)
+      localStorage.setItem('cached_events', JSON.stringify(normalizeForCache(updatedList)));
+
+      if (!navigator.onLine) {
+        addToQueue({ type: 'UPDATE', payload: { ...eventData, id: editingEvent.id } });
+      } else {
+        // Online: Try sending
+        try {
+          const { error } = await supabase.from('events').update(eventData).eq('id', editingEvent.id);
+          if (error) throw error;
+        } catch (err) {
+          console.error("Online save failed, queuing", err);
+          addToQueue({ type: 'UPDATE', payload: { ...eventData, id: editingEvent.id } });
+        }
+      }
+
+    } else {
+      // Create new
+      const tempId = Date.now(); // Temp ID for local use
+      const newEvent = { ...eventStateData, id: tempId, isLocal: true };
+
+      // Update UI
+      const updatedList = [...events, newEvent].sort((a, b) => new Date(a.date) - new Date(b.date));
+      setEvents(updatedList);
+
+      // Update Cache
+      localStorage.setItem('cached_events', JSON.stringify(normalizeForCache(updatedList)));
+
+      if (!navigator.onLine) {
+        addToQueue({ type: 'INSERT', payload: { ...eventData, id: tempId, isLocal: true } });
+      } else {
+        try {
+          const { error } = await supabase.from('events').insert([eventData]);
+          if (error) throw error;
+          // If successful, fetchEvents will eventually replace the temp ID item with real one
+          await fetchEvents();
+        } catch (err) {
+          addToQueue({ type: 'INSERT', payload: { ...eventData, id: tempId, isLocal: true } });
+        }
+      }
+    }
+
     setEventStartTime({ hours: "00", minutes: "00" });
     setEventEndTime({ hours: "01", minutes: "00" });
     setEventText("");
@@ -167,16 +319,15 @@ const CalendarApp = () => {
   const handleEditEvent = (event) => {
     setSelectedDate(new Date(event.date));
 
-    const startT = event.startTime || event.time;
-    const endT = event.endTime || event.time; // Fallback for legacy
+    // Handle both snake_case (DB) and camelCase (legacy/local)
+    const startT = event.start_time || event.startTime || event.time;
+    const endT = event.end_time || event.endTime || event.time;
 
     setEventStartTime({
       hours: startT.split(":")[0],
       minutes: startT.split(":")[1],
     });
 
-    // For end time, if legacy, maybe default to start + 1 or same? 
-    // If same, validation might fail on save, but user can edit.
     setEventEndTime({
       hours: endT.split(":")[0],
       minutes: endT.split(":")[1],
@@ -189,9 +340,37 @@ const CalendarApp = () => {
     setActiveTimeField("start");
   };
 
-  const handleDeleteEvent = (eventId) => {
+  const handleDeleteEvent = async (eventId) => {
+    // Optimistic Delete
     const updatedEvents = events.filter((event) => event.id !== eventId);
     setEvents(updatedEvents);
+
+    // Normalize and Save Cache
+    const normalizeForCache = (list) => list.map(ev => ({
+      ...ev,
+      date: ev.date instanceof Date
+        ? `${ev.date.getFullYear()}-${String(ev.date.getMonth() + 1).padStart(2, '0')}-${String(ev.date.getDate()).padStart(2, '0')}`
+        : ev.date
+    }));
+    localStorage.setItem('cached_events', JSON.stringify(normalizeForCache(updatedEvents)));
+
+    if (!navigator.onLine) {
+      addToQueue({ type: 'DELETE', id: eventId });
+    } else {
+      try {
+        const { error } = await supabase
+          .from('events')
+          .delete()
+          .eq('id', eventId);
+
+        if (error) throw error;
+        // Don't need to fetchEvents immediately since we already removed it from UI
+      } catch (error) {
+        console.error("Error deleting event:", error);
+        // Queue if fails
+        addToQueue({ type: 'DELETE', id: eventId });
+      }
+    }
   };
 
   const handleTimeChange = (e) => {
@@ -203,10 +382,12 @@ const CalendarApp = () => {
   };
 
   const isSameDay = (date1, date2) => {
+    const d1 = new Date(date1);
+    const d2 = new Date(date2);
     return (
-      date1.getFullYear() === date2.getFullYear() &&
-      date1.getMonth() === date2.getMonth() &&
-      date1.getDate() === date2.getDate()
+      d1.getFullYear() === d2.getFullYear() &&
+      d1.getMonth() === d2.getMonth() &&
+      d1.getDate() === d2.getDate()
     );
   };
 
@@ -320,8 +501,7 @@ const CalendarApp = () => {
     };
   }, [isDragging, timePickerMode]);
 
-  console.log(daysInMonth, firstDayOfMonth);
-  console.log(currentMonth, currentYear, currentDate);
+
 
   useEffect(() => {
     localStorage.setItem('theme', theme);
@@ -339,13 +519,22 @@ const CalendarApp = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
   return (
     <div className={`calendar-app ${theme === 'light' ? 'light-theme' : ''}`}>
       <div className="calendar">
         <h1 className="heading">Agenda</h1>
-        <button className="theme-toggle" onClick={toggleTheme}>
-          <i className={`bx ${theme === 'dark' ? 'bx-sun' : 'bx-moon'}`}></i>
-        </button>
+        <div className="header-controls">
+          <button className="theme-toggle" onClick={toggleTheme} title="Alternar Tema">
+            <i className={`bx ${theme === 'dark' ? 'bx-sun' : 'bx-moon'}`}></i>
+          </button>
+          <button className="theme-toggle" onClick={handleLogout} title="Sair">
+            <i className='bx bx-log-out'></i>
+          </button>
+        </div>
         <div className="navigate-date">
           <h2 className="month">
             {monthOfYear[currentMonth]} {currentYear}
@@ -403,8 +592,8 @@ const CalendarApp = () => {
         {events
           .filter((event) => isSameDay(event.date, selectedDate))
           .sort((a, b) => {
-            const timeA = a.startTime || a.time;
-            const timeB = b.startTime || b.time;
+            const timeA = a.start_time || a.startTime || a.time;
+            const timeB = b.start_time || b.startTime || b.time;
             const minA = parseInt(timeA.split(':')[0]) * 60 + parseInt(timeA.split(':')[1]);
             const minB = parseInt(timeB.split(':')[0]) * 60 + parseInt(timeB.split(':')[1]);
             return minA - minB;
@@ -415,7 +604,9 @@ const CalendarApp = () => {
                 <div className="event-date">{`${event.date.getDate()} de ${monthOfYear[event.date.getMonth()]
                   } de ${event.date.getFullYear()}`}</div>
                 <div className="event-time">
-                  {event.startTime || event.time} - {event.endTime || (event.startTime ? parseInt(event.startTime.split(':')[0]) + 1 + ':' + event.startTime.split(':')[1] : '')}
+                  <div className="event-time">
+                    {event.start_time || event.startTime || event.time} - {event.end_time || event.endTime || (event.startTime ? parseInt(event.startTime.split(':')[0]) + 1 + ':' + event.startTime.split(':')[1] : '')}
+                  </div>
                 </div>
               </div>
               <div className="event-text">{event.text}</div>
