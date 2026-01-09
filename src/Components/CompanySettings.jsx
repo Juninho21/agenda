@@ -536,7 +536,7 @@ const CompanySettings = () => {
                                     maxWidth: '300px', /* Allow wide logos */
                                     minHeight: '120px',
                                     borderRadius: '16px', /* Rounded rectangle instead of circle */
-                                    background: theme === 'dark' ? '#2c2c2c' : '#e0e0e0',
+                                    background: 'var(--bg-color)',
                                     border: '2px dashed var(--text-muted)',
                                     display: 'flex',
                                     alignItems: 'center',
