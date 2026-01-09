@@ -24,6 +24,7 @@ const CalendarApp = () => {
   const [currentMonth, setCurrentMonth] = useState(currentDate.getMonth());
   const [currentYear, setCurrentYear] = useState(currentDate.getFullYear());
   const [selectedDate, setSelectedDate] = useState(currentDate);
+  const [showCalendar, setShowCalendar] = useState(true);
   const [showEventPopup, setShowEventPopup] = useState(false);
   const [showAlertDialog, setShowAlertDialog] = useState(false);
   const [alertMessage, setAlertMessage] = useState("");
@@ -504,54 +505,71 @@ const CalendarApp = () => {
     <div className="calendar-app">
       {/* Header managed by Layout */}
       <div className="calendar-content">
-        <div className="calendar">
-          {/* Removed Heading and Header Controls */}
+        {showCalendar && (
+          <div className="calendar">
+            {/* Removed Heading and Header Controls */}
 
-          <div className="navigate-date">
-            <h2 className="month">
-              {monthOfYear[currentMonth]} {currentYear}
-            </h2>
-            <div className="buttons">
-              <i className="bx bx-chevron-left" onClick={prevMonth}></i>
-              <i className="bx bx-chevron-right" onClick={nextMonth}></i>
+            <div className="navigate-date">
+              <h2 className="month">
+                {monthOfYear[currentMonth]} {currentYear}
+              </h2>
+              <div className="buttons">
+                <i className="bx bx-chevron-left" onClick={prevMonth}></i>
+                <i className="bx bx-chevron-right" onClick={nextMonth}></i>
+              </div>
+            </div>
+            <div className="weekdays">
+              {dayOfWeek.map((day) => (
+                <span key={day}>{day}</span>
+              ))}
+            </div>
+            <div className="days">
+              {[...Array(firstDayOfMonth).keys()].map((_, index) => (
+                <span key={`empty-${index}`} />
+              ))}
+              {[...Array(daysInMonth).keys()].map((day) => {
+                const dateToCheck = new Date(currentYear, currentMonth, day + 1);
+                const eventCount = events.filter((event) =>
+                  isSameDay(event.date, dateToCheck)
+                ).length;
+
+                return (
+                  <span
+                    key={day + 1}
+                    className={
+                      `${isSameDay(dateToCheck, currentDate) ? "current-day " : ""
+                      }${isSameDay(dateToCheck, selectedDate) ? "selected-day" : ""
+                      }`
+                    }
+                    onClick={() => handleDayClick(day + 1)}
+                  >
+                    {day + 1}
+                    {eventCount > 0 && (
+                      <div className="event-count">{eventCount}</div>
+                    )}
+                  </span>
+                );
+              })}
             </div>
           </div>
-          <div className="weekdays">
-            {dayOfWeek.map((day) => (
-              <span key={day}>{day}</span>
-            ))}
-          </div>
-          <div className="days">
-            {[...Array(firstDayOfMonth).keys()].map((_, index) => (
-              <span key={`empty-${index}`} />
-            ))}
-            {[...Array(daysInMonth).keys()].map((day) => {
-              const dateToCheck = new Date(currentYear, currentMonth, day + 1);
-              const eventCount = events.filter((event) =>
-                isSameDay(event.date, dateToCheck)
-              ).length;
-
-              return (
-                <span
-                  key={day + 1}
-                  className={
-                    `${isSameDay(dateToCheck, currentDate) ? "current-day " : ""
-                    }${isSameDay(dateToCheck, selectedDate) ? "selected-day" : ""
-                    }`
-                  }
-                  onClick={() => handleDayClick(day + 1)}
-                >
-                  {day + 1}
-                  {eventCount > 0 && (
-                    <div className="event-count">{eventCount}</div>
-                  )}
-                </span>
-              );
-            })}
-          </div>
-        </div>
+        )}
         <div className="events">
-          <div className="events-header">
+          <div className="events-header" style={{ justifyContent: 'space-between', paddingLeft: '1rem' }}>
+            <button className="toggle-calendar-btn" onClick={() => setShowCalendar(!showCalendar)} style={{
+              background: 'transparent',
+              border: '1px solid var(--text-muted)',
+              color: 'var(--text-primary)',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '1rem'
+            }}>
+              <i className={`bx ${showCalendar ? 'bx-chevron-up' : 'bx-calendar'}`}></i>
+              {showCalendar ? 'Ocultar' : 'Ver Calendário'}
+            </button>
 
             <button className="add-event-btn" onClick={() => {
               setShowEventPopup(true);

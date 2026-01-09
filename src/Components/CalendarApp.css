@@ -63,7 +63,8 @@
 /* Removed .calendar-app::after */
 
 .calendar {
-  width: 40%;
+  flex: 0 0 40%;
+  transition: all 0.3s ease;
 }
 
 .heading {
@@ -233,12 +234,13 @@
 }
 
 .events {
-  width: 60%;
+  flex: 1;
   height: 100%;
-  padding: 8rem 0 3rem 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: all 0.3s ease;
 }
 
 .events-list {
@@ -697,12 +699,11 @@
   .events {
     width: 100%;
     margin: 0;
-    height: auto;
-    /* Allow events to flow */
-    max-height: 400px;
-    /* Increased slightly to accommodate header + list */
+    height: 100%;
+    flex: 1;
+    min-height: 0;
+    /* important for nested flex scroll */
     padding: 0;
-    /* Cap height */
     display: flex;
     flex-direction: column;
   }
