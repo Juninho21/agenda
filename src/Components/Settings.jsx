@@ -6,13 +6,11 @@ const Settings = () => {
     return (
         <div className="calendar-app">
             <div className="calendar" style={{ width: '100%', maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', height: 'auto' }}>
-                <div className="calendar-header" style={{ justifyContent: 'center' }}>
-                    <span className="month-picker">Configurações</span>
-                </div>
+
                 <div style={{ padding: '2rem' }}>
 
                     <div style={{ marginBottom: '2rem' }}>
-                        <h3 style={{ color: 'var(--text-primary)', marginBottom: '1rem', borderBottom: '1px solid var(--text-muted)', paddingBottom: '0.5rem' }}>Geral</h3>
+
 
                         <Link to="/settings/company" style={{ textDecoration: 'none' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem', background: 'var(--bg-element)', borderRadius: '12px', marginBottom: '1rem', cursor: 'pointer', transition: 'background 0.2s' }}>

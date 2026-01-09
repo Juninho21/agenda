@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "../supabaseClient";
 
-import Header from './Header';
+
 
 const CalendarApp = () => {
   const dayOfWeek = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -28,7 +28,7 @@ const CalendarApp = () => {
   const [showAlertDialog, setShowAlertDialog] = useState(false);
   const [alertMessage, setAlertMessage] = useState("");
   const [events, setEvents] = useState([]);
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+
   const [eventStartTime, setEventStartTime] = useState({ hours: "00", minutes: "00" });
   const [eventEndTime, setEventEndTime] = useState({ hours: "01", minutes: "00" });
   const [activeTimeField, setActiveTimeField] = useState("start"); // 'start' or 'end'
@@ -498,43 +498,11 @@ const CalendarApp = () => {
 
 
 
-  useEffect(() => {
-    localStorage.setItem('theme', theme);
-    const app = document.querySelector('.calendar-app');
-    if (app) {
-      if (theme === 'light') {
-        app.classList.add('light-theme');
-      } else {
-        app.classList.remove('light-theme');
-      }
-    }
-  }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
-  };
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-  };
 
   return (
-    <div className={`calendar-app ${theme === 'light' ? 'light-theme' : ''}`}>
-      <Header
-        title="Agenda"
-        actions={[
-          {
-            icon: <i className={`bx ${theme === 'dark' ? 'bx-sun' : 'bx-moon'}`}></i>,
-            onClick: toggleTheme,
-            title: "Alternar Tema"
-          },
-          {
-            icon: <i className='bx bx-log-out'></i>,
-            onClick: handleLogout,
-            title: "Sair"
-          }
-        ]}
-      />
+    <div className="calendar-app">
+      {/* Header managed by Layout */}
       <div className="calendar-content">
         <div className="calendar">
           {/* Removed Heading and Header Controls */}

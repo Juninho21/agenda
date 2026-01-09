@@ -70,7 +70,7 @@ const SignaturePad = ({ onChange, initialUrl, disabled = false }) => {
         const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
         const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
 
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 3;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round'; // Smoother turns
         ctx.strokeStyle = '#0051d4'; // Blue pen color
@@ -113,7 +113,12 @@ const SignaturePad = ({ onChange, initialUrl, disabled = false }) => {
             }}>
                 <canvas
                     ref={canvasRef}
-                    style={{ width: '100%', height: '100%', display: 'block' }}
+                    style={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'block',
+                        touchAction: 'none' // Crucial: prevents scrolling while signing
+                    }}
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
                     onMouseUp={stopDrawing}
@@ -128,9 +133,12 @@ const SignaturePad = ({ onChange, initialUrl, disabled = false }) => {
                         top: '50%',
                         left: '50%',
                         transform: 'translate(-50%, -50%)',
-                        color: '#ccc',
+                        color: 'rgba(0,0,0,0.2)', // More subtle but visible
                         pointerEvents: 'none',
-                        userSelect: 'none'
+                        userSelect: 'none',
+                        fontSize: '1.5rem',
+                        fontWeight: 'bold',
+                        textTransform: 'uppercase'
                     }}>
                         Assine aqui
                     </div>

@@ -3,12 +3,14 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-
 import { supabase } from './supabaseClient'
 import CalendarApp from "./Components/CalendarApp"
 import Login from "./Components/Login"
-import Navbar from "./Components/Navbar"
+
 import Activities from "./Components/Activities"
 import Settings from "./Components/Settings"
 import CompanySettings from "./Components/CompanySettings"
 import Products from "./Components/Products"
 import './Components/CalendarApp.css'
+
+import Layout from "./Components/Layout"
 
 const App = () => {
   const [session, setSession] = useState(null)
@@ -43,16 +45,8 @@ const App = () => {
       <Routes>
         <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
 
-        {/* Protected Routes with Navbar */}
-        <Route element={session ? (
-          <div className="container">
-            <Outlet />
-            <Navbar />
-          </div>
-        ) : (
-          <Navigate to="/login" />
-        )
-        }>
+        {/* Protected Routes with Layout (Header + Navbar) */}
+        <Route element={session ? <Layout /> : <Navigate to="/login" />}>
           <Route path="/" element={<CalendarApp />} />
           <Route path="/activities" element={<Activities />} />
           <Route path="/settings" element={<Settings />} />
