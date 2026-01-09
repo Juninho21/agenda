@@ -740,8 +740,8 @@
     left: 0;
     transform: none;
     border-radius: 0;
-    justify-content: center;
-    /* Center content vertically */
+    justify-content: flex-start;
+    overflow-y: auto;
   }
 
   /* Scale down clock for very narrow screens using transform to keep internal alignment intact */
