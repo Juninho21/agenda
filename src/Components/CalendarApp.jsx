@@ -105,20 +105,13 @@ const CalendarApp = () => {
   }, []);
 
   const handleDayClick = (day) => {
-    const clickedDate = new Date(currentYear, currentMonth, day);
-    const today = new Date();
-    // Reset hours to compare dates only
-    const clickedDateReset = new Date(clickedDate.setHours(0, 0, 0, 0));
-    const todayReset = new Date(today.setHours(0, 0, 0, 0));
-
-    if (clickedDateReset >= todayReset) {
-      setSelectedDate(new Date(currentYear, currentMonth, day));
-      setEventStartTime({ hours: "00", minutes: "00" });
-      setEventEndTime({ hours: "01", minutes: "00" });
-      setEventText("");
-      setEditingEvent(null);
-      setActiveTimeField("start");
-    }
+    // Allow selecting any day, even past ones
+    setSelectedDate(new Date(currentYear, currentMonth, day));
+    setEventStartTime({ hours: "00", minutes: "00" });
+    setEventEndTime({ hours: "01", minutes: "00" });
+    setEventText("");
+    setEditingEvent(null);
+    setActiveTimeField("start");
   };
 
   // Sync Queue Logic
