@@ -35,37 +35,43 @@ const Layout = () => {
     return (
         // Apply theme class here so it propagates to all children
         <div className={`app-layout ${theme === 'light' ? 'light-theme' : ''}`} style={{
-            height: '100vh',
+            height: '100dvh', /* Modern mobile viewport fix */
+            width: '100vw',
             display: 'flex',
             flexDirection: 'column',
             backgroundColor: 'var(--bg-color)',
             color: 'var(--text-primary)',
             overflow: 'hidden'
         }}>
-            <Header
-                title={getTitle(location.pathname)}
-                actions={[
-                    {
-                        icon: <i className={`bx ${theme === 'dark' ? 'bx-sun' : 'bx-moon'}`}></i>,
-                        onClick: toggleTheme,
-                        title: "Alternar Tema"
-                    },
-                    {
-                        icon: <i className='bx bx-log-out'></i>,
-                        onClick: handleLogout,
-                        title: "Sair"
-                    }
-                ]}
-            />
+            <div style={{ flex: '0 0 auto', zIndex: 1002 }}>
+                <Header
+                    title={getTitle(location.pathname)}
+                    actions={[
+                        {
+                            icon: <i className={`bx ${theme === 'dark' ? 'bx-sun' : 'bx-moon'}`}></i>,
+                            onClick: toggleTheme,
+                            title: "Alternar Tema"
+                        },
+                        {
+                            icon: <i className='bx bx-log-out'></i>,
+                            onClick: handleLogout,
+                            title: "Sair"
+                        }
+                    ]}
+                />
+            </div>
 
-            <div className="container" style={{
-                flex: 1,
+            <div className="content-wrapper" style={{
+                flex: '1 1 auto',
                 overflow: 'hidden',
                 position: 'relative',
                 display: 'flex',
                 flexDirection: 'column'
             }}>
                 <Outlet context={{ theme }} />
+            </div>
+
+            <div style={{ flex: '0 0 auto', zIndex: 1001 }}>
                 <Navbar />
             </div>
         </div>

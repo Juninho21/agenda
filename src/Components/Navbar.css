@@ -1,8 +1,6 @@
 /* Navbar Container - "Mobile Style" for All Devices */
 .navbar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
+    position: relative;
     width: 100%;
     transform: none;
     background: #1e242d;
@@ -149,9 +147,6 @@
 /* Mobile & Touch Improvements */
 @media (max-width: 600px) {
     .navbar {
-        bottom: 0;
-        left: 0;
-        transform: none;
         width: 100%;
         max-width: none;
         padding: 0.5rem 0;
