@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import SignaturePad from './SignaturePad';
 import './CalendarApp.css'; // Reusing general styles
 
 const CompanySettings = () => {
     const navigate = useNavigate();
+    const { theme } = useOutletContext();
     const [loading, setLoading] = useState(false);
     const [logoFile, setLogoFile] = useState(null);
     const [formData, setFormData] = useState({
@@ -535,7 +536,7 @@ const CompanySettings = () => {
                                     maxWidth: '300px', /* Allow wide logos */
                                     minHeight: '120px',
                                     borderRadius: '16px', /* Rounded rectangle instead of circle */
-                                    background: '#2c2c2c',
+                                    background: theme === 'dark' ? '#2c2c2c' : '#e0e0e0',
                                     border: '2px dashed var(--text-muted)',
                                     display: 'flex',
                                     alignItems: 'center',
