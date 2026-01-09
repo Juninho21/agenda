@@ -24,23 +24,18 @@ const Settings = () => {
                             </div>
                         </Link>
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--bg-element)', borderRadius: '10px', marginBottom: '1rem' }}>
-                            <span style={{ color: 'var(--text-primary)' }}>Idioma</span>
-                            <span style={{ color: 'var(--text-muted)' }}>Português (Brasil)</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--bg-element)', borderRadius: '10px' }}>
-                            <span style={{ color: 'var(--text-primary)' }}>Versão</span>
-                            <span style={{ color: 'var(--text-muted)' }}>1.0.0</span>
-                        </div>
+                        <Link to="/settings/products" style={{ textDecoration: 'none' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem', background: 'var(--bg-element)', borderRadius: '12px', marginBottom: '1rem', cursor: 'pointer', transition: 'background 0.2s' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <i className='bx bx-package' style={{ fontSize: '2.4rem', color: 'var(--accent-color)' }}></i>
+                                    <span style={{ color: 'var(--text-primary)', fontSize: '1.6rem', fontWeight: '500' }}>Produtos</span>
+                                </div>
+                                <i className='bx bx-chevron-right' style={{ color: 'var(--text-muted)', fontSize: '2.4rem' }}></i>
+                            </div>
+                        </Link>
                     </div>
 
-                    <div style={{ marginBottom: '2rem' }}>
-                        <h3 style={{ color: 'var(--text-primary)', marginBottom: '1rem', borderBottom: '1px solid var(--text-muted)', paddingBottom: '0.5rem' }}>Conta</h3>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--bg-element)', borderRadius: '10px' }}>
-                            <span style={{ color: 'var(--text-primary)' }}>Sessão</span>
-                            <span style={{ color: 'var(--accent-color)' }}>Ativa</span>
-                        </div>
-                    </div>
+
 
                 </div>
             </div>

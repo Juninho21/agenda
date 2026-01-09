@@ -40,14 +40,25 @@
   width: 100%;
   height: 100%;
   background-color: var(--bg-color);
-  padding: 2rem;
+  padding: 0;
   display: flex;
-  column-gap: 5rem;
+  flex-direction: column;
   position: relative;
   color: var(--text-primary);
   transition: background-color 0.3s, color 0.3s;
   overflow: hidden;
-  /* Ensure content stays within fullscreen */
+}
+
+.calendar-content {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  display: flex;
+  column-gap: 5rem;
+  padding: 2rem;
+  padding-bottom: 100px;
+  /* Space for fixed bottom navbar */
+  overflow-y: auto;
 }
 
 /* Removed .calendar-app::after */
@@ -224,10 +235,20 @@
   width: 60%;
   height: 100%;
   padding: 8rem 0 3rem 0;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.events::-webkit-scrollbar {
+.events-list {
+  overflow-y: auto;
+  flex: 1;
+  width: 100%;
+  padding-right: 5px;
+  /* Prevent content from hiding behind scrollbar if any */
+}
+
+.events-list::-webkit-scrollbar {
   display: none;
 }
 
@@ -639,13 +660,12 @@
     transform: scale(0.9);
   }
 
-  .calendar-app {
-    width: 100%;
-    height: 100%;
-    /* Fullscreen */
+  .calendar-content {
     flex-direction: column;
     row-gap: 2rem;
     padding: 2rem;
+    padding-bottom: 100px;
+    /* Ensure space for fixed bottom navbar */
     overflow-y: auto;
   }
 
@@ -667,9 +687,17 @@
     margin: 0;
     height: auto;
     /* Allow events to flow */
-    max-height: 300px;
+    max-height: 400px;
+    /* Increased slightly to accommodate header + list */
     padding: 0;
     /* Cap height */
+    display: flex;
+    flex-direction: column;
+  }
+
+  .events-list {
+    overflow-y: auto;
+    flex: 1;
   }
 
   /* Removed legacy .event-popup overrides that broke the new modal */

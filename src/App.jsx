@@ -7,6 +7,7 @@ import Navbar from "./Components/Navbar"
 import Activities from "./Components/Activities"
 import Settings from "./Components/Settings"
 import CompanySettings from "./Components/CompanySettings"
+import Products from "./Components/Products"
 import './Components/CalendarApp.css'
 
 const App = () => {
@@ -56,6 +57,7 @@ const App = () => {
           <Route path="/activities" element={<Activities />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/settings/company" element={<CompanySettings />} />
+          <Route path="/settings/products" element={<Products />} />
         </Route>
       </Routes>
     </Router>
