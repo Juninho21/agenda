@@ -9,6 +9,7 @@ const Clients = () => {
     const [view, setView] = useState('list'); // 'list' or 'form'
     const [clients, setClients] = useState([]);
     const [formData, setFormData] = useState({
+        id: null,
         type: 'pf', // 'pf' or 'pj'
         name: '',
         fantasyName: '',
@@ -62,6 +63,7 @@ const Clients = () => {
             setView('list');
             // Reset form
             setFormData({
+                id: null,
                 type: 'pf', // 'pf' or 'pj'
                 name: '',
                 fantasyName: '',
@@ -127,6 +129,47 @@ const Clients = () => {
         }));
     };
 
+    const handleEdit = (client) => {
+        setFormData({
+            id: client.id,
+            type: client.type,
+            name: client.name,
+            fantasyName: client.fantasyName || '',
+            contactName: client.contactName || '',
+            document: client.document || '',
+            email: client.email || '',
+            phone: client.phone || '',
+            street: client.street || '',
+            number: client.number || '',
+            neighborhood: client.neighborhood || '',
+            city: client.city || '',
+            state: client.state || ''
+        });
+        setView('form');
+    };
+
+    const handleDelete = async (id) => {
+        if (!window.confirm('Tem certeza que deseja excluir este cliente?')) return;
+
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('clients')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+
+            setClients(prev => prev.filter(client => client.id !== id));
+            alert('Cliente excluído com sucesso!');
+        } catch (error) {
+            console.error('Error deleting client:', error);
+            alert('Erro ao excluir cliente.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleSave = async () => {
         if (!formData.name) return alert('Por favor, preencha o nome.');
 
@@ -151,9 +194,21 @@ const Clients = () => {
                 state: formData.state
             };
 
-            const { error } = await supabase
-                .from('clients')
-                .insert([payload]);
+            let error;
+            if (formData.id) {
+                // Update
+                const { error: updateError } = await supabase
+                    .from('clients')
+                    .update(payload)
+                    .eq('id', formData.id);
+                error = updateError;
+            } else {
+                // Insert
+                const { error: insertError } = await supabase
+                    .from('clients')
+                    .insert([payload]);
+                error = insertError;
+            }
 
             if (error) throw error;
 
@@ -162,7 +217,7 @@ const Clients = () => {
             fetchClients();
         } catch (error) {
             console.error('Error saving client:', error);
-            alert('Erro ao salvar cliente. Verifique se a tabela "clients" existe.');
+            alert('Erro ao salvar cliente.');
         } finally {
             setLoading(false);
         }
@@ -223,11 +278,59 @@ const Clients = () => {
                                             justifyContent: 'space-between',
                                             alignItems: 'center'
                                         }}>
-                                            <div>
-                                                <div style={{ fontSize: '1.2rem', fontWeight: '500', color: 'var(--text-primary)' }}>{client.name}</div>
-                                                <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{client.document}</div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                <div style={{ fontSize: '1.2rem', fontWeight: '500', color: 'var(--text-primary)' }}>
+                                                    {client.code && (
+                                                        <span style={{ color: 'var(--accent-color)', marginRight: '8px', fontWeight: 'bold' }}>
+                                                            {client.code}
+                                                        </span>
+                                                    )}
+                                                    {client.name}
+                                                    {client.fantasyName && <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginLeft: '8px' }}>({client.fantasyName})</span>}
+                                                </div>
+
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '4px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <i className='bx bx-id-card'></i>
+                                                        {client.type === 'pj' ? 'CNPJ: ' : 'CPF: '} {client.document}
+                                                    </div>
+
+                                                    {client.contactName && (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <i className='bx bx-user'></i>
+                                                            Contato: {client.contactName}
+                                                        </div>
+                                                    )}
+
+                                                    {(client.phone || client.email) && (
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                                                            {client.phone && (
+                                                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                    <i className='bx bx-phone'></i> {client.phone}
+                                                                </span>
+                                                            )}
+                                                            {client.email && (
+                                                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                    <i className='bx bx-envelope'></i> {client.email}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {(client.street || client.city) && (
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                                                            <i className='bx bx-map' style={{ marginTop: '2px' }}></i>
+                                                            <span>
+                                                                {client.street}{client.number ? `, ${client.number}` : ''}
+                                                                {client.neighborhood ? ` - ${client.neighborhood}` : ''}
+                                                                {client.city ? ` - ${client.city}` : ''}
+                                                                {client.state ? `/${client.state}` : ''}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
                                                 <span style={{
                                                     padding: '0.2rem 0.6rem',
                                                     borderRadius: '8px',
@@ -237,6 +340,36 @@ const Clients = () => {
                                                 }}>
                                                     {client.type === 'pj' ? 'PJ' : 'PF'}
                                                 </span>
+                                                <div style={{ display: 'flex', gap: '5px' }}>
+                                                    <button
+                                                        onClick={() => handleEdit(client)}
+                                                        style={{
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            cursor: 'pointer',
+                                                            color: 'var(--text-muted)',
+                                                            fontSize: '1.2rem',
+                                                            padding: '4px'
+                                                        }}
+                                                        title="Editar"
+                                                    >
+                                                        <i className='bx bx-edit'></i>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(client.id)}
+                                                        style={{
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            cursor: 'pointer',
+                                                            color: '#ff4d4d',
+                                                            fontSize: '1.2rem',
+                                                            padding: '4px'
+                                                        }}
+                                                        title="Excluir"
+                                                    >
+                                                        <i className='bx bx-trash'></i>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     ))
