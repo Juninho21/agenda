@@ -8,6 +8,8 @@ import Activities from "./Components/Activities"
 import Settings from "./Components/Settings"
 import CompanySettings from "./Components/CompanySettings"
 import Products from "./Components/Products"
+import Clients from "./Components/Clients"
+import UserManagement from "./Components/UserManagement"
 import './Components/CalendarApp.css'
 
 import Layout from "./Components/Layout"
@@ -51,7 +53,9 @@ const App = () => {
           <Route path="/activities" element={<Activities />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/settings/company" element={<CompanySettings />} />
+          <Route path="/settings/clients" element={<Clients />} />
           <Route path="/settings/products" element={<Products />} />
+          <Route path="/settings/users" element={<UserManagement />} />
         </Route>
       </Routes>
     </Router>
