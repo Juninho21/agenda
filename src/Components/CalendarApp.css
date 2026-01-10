@@ -534,6 +534,8 @@
     box-shadow: 0 2px 8px var(--shadow-color);
     border-left: 4px solid var(--accent-color);
     transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .event:hover {
