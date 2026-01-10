@@ -107,7 +107,7 @@ const CalendarApp = () => {
 
   const fetchClients = async () => {
     try {
-      const { data } = await supabase.from('clients').select('id, name, fantasy_name, phone, street, number, neighborhood, city').order('name');
+      const { data } = await supabase.from('clients').select('id, name, fantasy_name, phone, street, number, neighborhood, city, code').order('name');
       if (data) setClients(data);
     } catch (error) {
       console.error('Error fetching clients', error);
@@ -607,60 +607,71 @@ const CalendarApp = () => {
                 const minB = parseInt(timeB.split(':')[0]) * 60 + parseInt(timeB.split(':')[1]);
                 return minA - minB;
               })
-              .map((event, index) => (
-                <div className="event" key={index}>
-                  <div className="event-date-wrapper" style={{ minWidth: '130px' }}>
-                    <div className="event-date">{`${event.date.getDate()} de ${monthOfYear[event.date.getMonth()]
-                      } de ${event.date.getFullYear()}`}</div>
-                    <div className="event-time" style={{ whiteSpace: 'nowrap', fontSize: '1.4rem' }}>
-                      {event.start_time || event.startTime || event.time} - {event.end_time || event.endTime || (event.startTime ? parseInt(event.startTime.split(':')[0]) + 1 + ':' + event.startTime.split(':')[1] : '')}
+              .map((event, index) => {
+                const client = event.client_id ? clients.find(c => c.id === event.client_id) : null;
+                return (
+                  <div className="event" key={index}>
+                    <div className="event-date-wrapper" style={{ minWidth: '130px' }}>
+                      {client && client.code && (
+                        <div style={{
+                          backgroundColor: 'var(--accent-color)',
+                          color: '#fff',
+                          fontSize: '0.8rem',
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          marginBottom: '4px',
+                          fontWeight: 'bold',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}>
+                          {client.code}
+                        </div>
+                      )}
+                      <div className="event-date">{`${event.date.getDate()} de ${monthOfYear[event.date.getMonth()]
+                        } de ${event.date.getFullYear()}`}</div>
+                      <div className="event-time" style={{ whiteSpace: 'nowrap', fontSize: '1.4rem' }}>
+                        {event.start_time || event.startTime || event.time} - {event.end_time || event.endTime || (event.startTime ? parseInt(event.startTime.split(':')[0]) + 1 + ':' + event.startTime.split(':')[1] : '')}
+                      </div>
+                    </div>
+
+                    <div className="event-details" style={{ flex: 1, padding: '0 1rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div className="event-text" style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>{event.text}</div>
+
+                      {client && (
+                        <div className="client-info" style={{ display: 'flex', flexDirection: 'column', fontSize: '1.3rem', color: 'var(--text-secondary)' }}>
+                          <div style={{ color: 'var(--accent-color)', fontWeight: '700', fontSize: '1.5rem', marginBottom: '4px' }}>
+                            <i className='bx bxs-user-detail' style={{ marginRight: '8px' }}></i>
+                            {client.fantasy_name || client.name}
+                          </div>
+                          {client.phone && (
+                            <div style={{ marginBottom: '2px' }}>
+                              <i className='bx bxs-phone' style={{ marginRight: '8px' }}></i>
+                              {client.phone}
+                            </div>
+                          )}
+                          {(client.street || client.city) && (
+                            <div style={{ fontSize: '1.2rem', opacity: 0.9, lineHeight: '1.4' }}>
+                              <i className='bx bxs-map' style={{ marginRight: '8px' }}></i>
+                              {client.street}{client.number ? `, ${client.number}` : ''}
+                              {client.neighborhood ? ` - ${client.neighborhood}` : ''}
+                              {client.city ? ` - ${client.city}` : ''}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="event-buttons">
+                      <i
+                        className="bx bxs-edit-alt"
+                        onClick={() => handleEditEvent(event)}
+                      ></i>
+                      <i
+                        className="bx bxs-message-alt-x"
+                        onClick={() => handleDeleteEvent(event.id)}
+                      ></i>
                     </div>
                   </div>
-
-                  <div className="event-details" style={{ flex: 1, padding: '0 1rem', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div className="event-text" style={{ fontSize: '1.4rem', fontWeight: 'bold' }}>{event.text}</div>
-
-                    {event.client_id && (() => {
-                      const client = clients.find(c => c.id === event.client_id);
-                      if (client) {
-                        return (
-                          <div className="client-info" style={{ display: 'flex', flexDirection: 'column', fontSize: '1.3rem', color: 'var(--text-secondary)' }}>
-                            <div style={{ color: 'var(--accent-color)', fontWeight: '700', fontSize: '1.5rem', marginBottom: '4px' }}>
-                              <i className='bx bxs-user-detail' style={{ marginRight: '8px' }}></i>
-                              {client.fantasy_name || client.name}
-                            </div>
-                            {client.phone && (
-                              <div style={{ marginBottom: '2px' }}>
-                                <i className='bx bxs-phone' style={{ marginRight: '8px' }}></i>
-                                {client.phone}
-                              </div>
-                            )}
-                            {(client.street || client.city) && (
-                              <div style={{ fontSize: '1.2rem', opacity: 0.9, lineHeight: '1.4' }}>
-                                <i className='bx bxs-map' style={{ marginRight: '8px' }}></i>
-                                {client.street}{client.number ? `, ${client.number}` : ''}
-                                {client.neighborhood ? ` - ${client.neighborhood}` : ''}
-                                {client.city ? ` - ${client.city}` : ''}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-                  <div className="event-buttons">
-                    <i
-                      className="bx bxs-edit-alt"
-                      onClick={() => handleEditEvent(event)}
-                    ></i>
-                    <i
-                      className="bx bxs-message-alt-x"
-                      onClick={() => handleDeleteEvent(event.id)}
-                    ></i>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
           </div>
         </div>
       </div>
