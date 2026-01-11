@@ -3,7 +3,12 @@ import { supabase } from '../supabaseClient';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './CalendarApp.css';
 import { format } from 'date-fns';
+
 import { ptBR } from 'date-fns/locale';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import 'jspdf-autotable';
+import SignaturePad from './SignaturePad';
 
 const deviceTypes = {
     'Porta Isca': ['Conforme', 'Mofada', 'Consumida', 'Deteriorada', 'Dispositivo Obstruído', 'Dispositivo Danificado', 'Sem Dispositivo', 'Praga Encontrada', 'Novo Dispositivo'],
@@ -47,6 +52,16 @@ const Activities = () => {
     // Product Form State
     const [currentProduct, setCurrentProduct] = useState({ name: '', quantity: '', unit: 'ml' });
 
+    // Signature State
+    const [showSignatureModal, setShowSignatureModal] = useState(false);
+    const [signatureData, setSignatureData] = useState(null);
+    const [tempSignature, setTempSignature] = useState(null);
+
+    // Pest Count State
+    const [showPestCountModal, setShowPestCountModal] = useState(false);
+    const [currentCountingDevice, setCurrentCountingDevice] = useState(null); // { serviceId, deviceId, deviceNumber, ... }
+    const [pestCountForm, setPestCountForm] = useState({ Moscas: 0, Mosquitos: 0, Mariposas: 0, Outros: [] });
+
     // Lists State
     const [serviceTypeList, setServiceTypeList] = useState(['Inspeção', 'Monitoramento', 'Pulverização', 'Atomização', 'Termonebulização', 'Polvilhamento', 'Iscagem com Gel', 'Implantação']);
     const [targetPestList, setTargetPestList] = useState(['Roedores', 'Moscas', 'Mosquitos', 'Baratas', 'Formigas', 'Aranhas', 'Traças']);
@@ -55,25 +70,49 @@ const Activities = () => {
 
     useEffect(() => {
         fetchProducts(); // Fetch registered products
-        // If passed via navigation state, start execution immediately
-        // If passed via navigation state, start execution immediately
+
+        // Priority 1: Navigation state (New OS)
         if (location.state && location.state.clientName) {
             startExecutionFromState(location.state);
-        } else {
-            fetchServiceOrders();
+        }
+        // Priority 2: Resume active OS from localStorage
+        else {
+            const savedOS = localStorage.getItem('active_os_context');
+            if (savedOS) {
+                const parsedOS = JSON.parse(savedOS);
+                setActiveOS(parsedOS.activeOS);
+                setOsData(prev => ({ ...prev, ...parsedOS.osData, checkIn: new Date(parsedOS.osData.checkIn) })); // Restore dates
+                setView('execution');
+                setActiveTab('service');
+            } else {
+                fetchServiceOrders();
+            }
         }
     }, [location.state]);
 
+    // Save state whenever relevant data changes
+    useEffect(() => {
+        if (view === 'execution' && activeOS) {
+            localStorage.setItem('active_os_context', JSON.stringify({
+                activeOS,
+                osData
+            }));
+        }
+    }, [view, activeOS, osData]);
+
     const startExecutionFromState = (state) => {
-        setActiveOS({
+        const newOS = {
             id: state.eventId || 'temp-id',
             clientName: state.clientName,
             address: 'Endereço do Cliente (Carregar)', // In real app, fetch this
             description: state.description
-        });
+        };
+
+        setActiveOS(newOS);
 
         // Auto Check-in
-        setOsData(prev => ({ ...prev, checkIn: new Date() }));
+        const initialOsData = { ...osData, checkIn: new Date() };
+        setOsData(initialOsData);
 
         setView('execution');
         setActiveTab('service');
@@ -130,7 +169,9 @@ const Activities = () => {
                     type: currentDevice.type,
                     status: currentDevice.status,
                     number: num,
-                    id: existingIndex >= 0 ? newDevices[existingIndex].id : Date.now() + Math.random() // Keep ID if exists
+                    id: existingIndex >= 0 ? newDevices[existingIndex].id : Date.now() + Math.random(), // Keep ID if exists
+                    pestCounts: existingIndex >= 0 ? (newDevices[existingIndex].pestCounts || []) : [], // Preserve or init counts
+                    pestCountDone: existingIndex >= 0 ? (newDevices[existingIndex].pestCountDone || false) : false
                 };
 
                 if (existingIndex >= 0) {
@@ -177,7 +218,9 @@ const Activities = () => {
                         id: Date.now() + Math.random(),
                         number: numStr,
                         type: currentDevice.type, // Use currently selected type
-                        status: 'Conforme'
+                        status: 'Conforme',
+                        pestCounts: [],
+                        pestCountDone: true // Conforme doesn't need count
                     });
                 }
             }
@@ -217,6 +260,20 @@ const Activities = () => {
         setCurrentProduct({ name: '', quantity: '', unit: 'ml' });
 
         alert('Serviço salvo! Você pode adicionar outro serviço para esta OS.');
+
+        // Check for pending counts immediately after saving
+        const hasPending = newService.devices.some(d =>
+            d.type === 'Armadilha Luminosa' &&
+            ['Refil Substituído', 'Praga Encontrada'].includes(d.status) &&
+            !d.pestCountDone
+        );
+
+        if (hasPending) {
+            if (window.confirm('Existem dispositivos que requerem contagem de pragas. Deseja realizar a contagem agora?')) {
+                setShowPestCountModal(true);
+            }
+        }
+
         setActiveTab('service'); // Return to first tab
     };
 
@@ -290,9 +347,212 @@ const Activities = () => {
             handleCheckOut(); // Auto checkout if forgot
         }
 
+        // Validate Pending Counts
+        const pendingCounts = finalServices.flatMap(s => s.devices).filter(d =>
+            d.type === 'Armadilha Luminosa' &&
+            ['Refil Substituído', 'Praga Encontrada'].includes(d.status) &&
+            !d.pestCountDone
+        );
+
+        if (pendingCounts.length > 0) {
+            setShowPestCountModal(true);
+            return alert(`Existem ${pendingCounts.length} dispositivos aguardando contagem de pragas. Realize a contagem antes de finalizar.`);
+        }
+
+        if (!signatureData) {
+            return alert('É necessário coletar a assinatura do cliente antes de finalizar.');
+        }
+
+        // Generate PDF
+        generatePDF(finalServices, activeOS, osData.checkIn, osData.checkOut || new Date(), signatureData);
+
         console.log('Finalizing OS:', { activeOS, checkIn: osData.checkIn, checkOut: new Date(), services: finalServices });
-        alert(`OS Finalizada com ${finalServices.length} serviço(s)!`);
+
+        // Clear saved context
+        localStorage.removeItem('active_os_context');
+
+        alert(`OS Finalizada com sucesso! O relatório PDF foi gerado.`);
         navigate('/'); // Go back to calendar
+    };
+
+    const generatePDF = (services, clientInfo, checkIn, checkOut, signature) => {
+        const doc = new jsPDF();
+
+        // Header
+        doc.setFontSize(18);
+        doc.text("RELATÓRIO DE ORDEM DE SERVIÇO", 105, 15, { align: 'center' });
+
+        doc.setFontSize(10);
+        doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 105, 22, { align: 'center' });
+
+        // Client Info
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text("DADOS DO CLIENTE", 14, 35);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.text(`Cliente: ${clientInfo.clientName || 'N/A'}`, 14, 42);
+        doc.text(`Endereço: ${clientInfo.address || 'N/A'}`, 14, 47);
+        doc.text(`Check-in: ${format(new Date(checkIn), 'dd/MM/yyyy HH:mm')}`, 14, 52);
+        doc.text(`Check-out: ${format(new Date(checkOut), 'dd/MM/yyyy HH:mm')}`, 80, 52);
+
+        let yPos = 60;
+
+        // Loop through services
+        services.forEach((service, index) => {
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`SERVIÇO ${index + 1}: ${service.serviceType}`, 14, yPos);
+            yPos += 7;
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Praga Alvo: ${service.targetPest} | Local: ${service.location}`, 14, yPos);
+            yPos += 7;
+
+            // Products Table
+            if (service.products && service.products.length > 0) {
+                const productData = service.products.map(p => [p.name, `${p.quantity} ${p.unit}`, p.active_ingredient || '-', p.batch || '-']);
+                doc.autoTable({
+                    startY: yPos,
+                    head: [['Produto Utilizado', 'Qtd', 'Princípio Ativo', 'Lote']],
+                    body: productData,
+                    theme: 'grid',
+                    styles: { fontSize: 8 },
+                    headStyles: { fillColor: [41, 128, 185] }
+                });
+                yPos = doc.lastAutoTable.finalY + 10;
+            }
+
+            // Devices Table (Simplified with Pest Count)
+            if (service.devices && service.devices.length > 0) {
+                // Group devices for cleaner report or list them? 
+                // Listing is safer for audit.
+                // Columns: [Dispositivo, Nº, Status, Pragas (se houver)]
+
+                const deviceData = service.devices.map(d => {
+                    let obs = '';
+                    if (d.pestCounts && d.pestCounts.length > 0) {
+                        obs = d.pestCounts.map(pc => `${pc.name}: ${pc.quantity}`).join(', ');
+                    }
+                    return [d.type, d.number, d.status, obs || '-'];
+                });
+
+                doc.autoTable({
+                    startY: yPos,
+                    head: [['Dispositivo', 'Nº', 'Status', 'Contagem de Pragas']],
+                    body: deviceData,
+                    theme: 'plain',
+                    styles: { fontSize: 8 },
+                    columnStyles: {
+                        0: { cellWidth: 40 },
+                        1: { cellWidth: 20 },
+                        2: { cellWidth: 50 },
+                        3: { cellWidth: 'auto' }
+                    }
+                });
+                yPos = doc.lastAutoTable.finalY + 10;
+            }
+
+            if (service.observations) {
+                doc.text(`Observações: ${service.observations}`, 14, yPos);
+                yPos += 10;
+            }
+
+            yPos += 5; // Spacing between services
+        });
+
+        // Signature
+        if (signature) {
+            if (yPos > 240) { doc.addPage(); yPos = 20; } // Check page break
+            doc.addImage(signature, 'PNG', 14, yPos, 60, 30);
+            doc.line(14, yPos + 32, 74, yPos + 32);
+            doc.text("Assinatura do Cliente", 14, yPos + 38);
+        }
+
+        doc.save(`OS_${clientInfo.clientName.replace(/\s+/g, '_')}_${format(new Date(), 'ddMMyyyy')}.pdf`);
+    };
+
+    const saveSignature = () => {
+        if (!tempSignature) {
+            alert("Por favor, assine antes de confirmar.");
+            return;
+        }
+        setSignatureData(tempSignature);
+        setShowSignatureModal(false);
+    };
+
+    const handleOpenSignatureModal = () => {
+        setTempSignature(null);
+        setShowSignatureModal(true);
+    };
+
+    // Pest Count Logic
+    const getPendingCountDevices = () => {
+        const list = [];
+        savedServices.forEach(service => {
+            service.devices.forEach(device => {
+                if (device.type === 'Armadilha Luminosa' &&
+                    ['Refil Substituído', 'Praga Encontrada'].includes(device.status) &&
+                    !device.pestCountDone) {
+                    list.push({ ...device, serviceId: service.id, serviceType: service.serviceType });
+                }
+            });
+        });
+        return list;
+    };
+
+    const handleOpenPestCount = (device, serviceId) => {
+        setCurrentCountingDevice({ ...device, serviceId });
+        // Init form with existing counts if any (rare case for pending)
+        const initialCounts = { Moscas: 0, Mosquitos: 0, Mariposas: 0, Outros: [] };
+        if (device.pestCounts) {
+            device.pestCounts.forEach(p => {
+                if (initialCounts[p.name] !== undefined) initialCounts[p.name] = p.quantity;
+                else initialCounts.Outros.push(p);
+            });
+        }
+        setPestCountForm(initialCounts);
+    };
+
+    const handleSavePestCount = () => {
+        if (!currentCountingDevice) return;
+
+        const counts = [
+            { name: 'Moscas', quantity: pestCountForm.Moscas },
+            { name: 'Mosquitos', quantity: pestCountForm.Mosquitos },
+            { name: 'Mariposas', quantity: pestCountForm.Mariposas },
+            ...pestCountForm.Outros
+        ].filter(c => c.quantity > 0);
+
+        setSavedServices(prev => prev.map(s => {
+            if (s.id === currentCountingDevice.serviceId) {
+                return {
+                    ...s,
+                    devices: s.devices.map(d => {
+                        if (d.number === currentCountingDevice.number && d.type === currentCountingDevice.type) { // Assumes unique number per type/service or use ID
+                            return { ...d, pestCounts: counts, pestCountDone: true };
+                        }
+                        return d;
+                    })
+                };
+            }
+            return s;
+        }));
+
+        setCurrentCountingDevice(null);
+
+        // If no more pending, close modal? No, keep open to finish list
+        // Actually, if we are in the "modal list view", we just stay there.
+        // We only close the DETAIL view (currentCountingDevice = null).
+    };
+
+    const updatePestCount = (pest, delta) => {
+        setPestCountForm(prev => ({
+            ...prev,
+            [pest]: Math.max(0, (prev[pest] || 0) + delta)
+        }));
     };
 
     const renderTabButton = (id, label, icon) => (
@@ -341,10 +601,37 @@ const Activities = () => {
                     {renderTabButton('devices', 'Dispositivos', 'bx-target-lock')}
                     {renderTabButton('products', 'Produtos', 'bx-spray-can')}
                     {renderTabButton('evidence', 'NC', 'bx-camera')}
+                    {renderTabButton('pests', 'Contagem', 'bx-bug')}
                 </div>
 
                 {/* Content */}
                 <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
+
+                    {/* Pest Count Alert/Button */}
+                    {getPendingCountDevices().length > 0 && (
+                        <div style={{ marginBottom: '15px', padding: '10px', background: '#fff4e5', borderLeft: '4px solid #ff9800', borderRadius: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <i className='bx bx-error' style={{ color: '#ef6c00', fontSize: '1.2rem' }}></i>
+                                <span style={{ color: '#e65100', fontWeight: 'bold' }}>
+                                    {getPendingCountDevices().length} contagens pendentes
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => setShowPestCountModal(true)}
+                                style={{
+                                    padding: '6px 12px',
+                                    background: '#ef6c00',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.85rem'
+                                }}
+                            >
+                                Realizar Contagem
+                            </button>
+                        </div>
+                    )}
 
                     {/* Tab: Service Info */}
                     {activeTab === 'service' && (
@@ -422,18 +709,20 @@ const Activities = () => {
                                                             {Object.entries(service.devices.reduce((acc, dev) => {
                                                                 if (!acc[dev.type]) acc[dev.type] = {};
                                                                 if (!acc[dev.type][dev.status]) acc[dev.type][dev.status] = [];
-                                                                acc[dev.type][dev.status].push(dev.number);
+                                                                acc[dev.type][dev.status].push(dev);
                                                                 return acc;
                                                             }, {})).map(([type, statusGroups]) => (
                                                                 <div key={type} style={{ marginLeft: '8px', marginBottom: '2px' }}>
                                                                     <span style={{ color: 'var(--text-primary)' }}>{type}:</span>
-                                                                    {Object.entries(statusGroups).map(([status, nums]) => {
-                                                                        const percentage = Math.round((nums.length / service.devices.length) * 100);
+                                                                    {Object.entries(statusGroups).map(([status, devices]) => {
+                                                                        const percentage = Math.round((devices.length / service.devices.length) * 100);
+                                                                        const numberList = devices.sort((a, b) => parseInt(a.number) - parseInt(b.number)).map(d => d.number).join(', ');
+
                                                                         return (
                                                                             <div key={status} style={{ marginLeft: '8px' }}>
                                                                                 <span style={{ color: 'var(--text-secondary)' }}>{status} ({percentage}%): </span>
                                                                                 <span style={{ color: 'var(--accent-color)', fontWeight: 'bold' }}>
-                                                                                    {nums.sort((a, b) => parseInt(a) - parseInt(b)).join(', ')}
+                                                                                    {numberList}
                                                                                 </span>
                                                                             </div>
                                                                         );
@@ -786,9 +1075,79 @@ const Activities = () => {
                             </div>
 
                         </div>
+
+                    )}
+
+                    {/* Tab: Pest Counts Table */}
+                    {activeTab === 'pests' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                            <div style={{ background: 'var(--bg-element)', padding: '15px', borderRadius: '10px' }}>
+                                <h4 style={{ margin: '0 0 15px 0', color: 'var(--text-primary)' }}>Tabela de Contagem</h4>
+
+                                {(() => {
+                                    // Aggregate all devices with counts
+                                    const allCountedDevices = [];
+                                    savedServices.forEach(s => {
+                                        if (s.devices) {
+                                            s.devices.forEach(d => {
+                                                if (d.pestCounts && d.pestCounts.length > 0) {
+                                                    allCountedDevices.push({ ...d, location: s.location });
+                                                }
+                                            });
+                                        }
+                                    });
+
+                                    if (allCountedDevices.length === 0) {
+                                        return <p style={{ color: 'var(--text-secondary)', textAlign: 'center' }}>Nenhuma contagem registrada.</p>;
+                                    }
+
+                                    return (
+                                        <div style={{ overflowX: 'auto' }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                                <thead>
+                                                    <tr style={{ background: '#f8f9fa', borderBottom: '2px solid #eee' }}>
+                                                        <th style={{ padding: '10px', textAlign: 'left', color: '#666' }}>Disp.</th>
+                                                        <th style={{ padding: '10px', textAlign: 'center', color: '#666' }}>Moscas</th>
+                                                        <th style={{ padding: '10px', textAlign: 'center', color: '#666' }}>Mosquitos</th>
+                                                        <th style={{ padding: '10px', textAlign: 'center', color: '#666' }}>Mariposas</th>
+                                                        <th style={{ padding: '10px', textAlign: 'left', color: '#666' }}>Outros</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {allCountedDevices.map((d, i) => {
+                                                        const getCount = (name) => d.pestCounts.find(p => p.name === name)?.quantity || 0;
+                                                        const outros = d.pestCounts.filter(p => !['Moscas', 'Mosquitos', 'Mariposas'].includes(p.name)).map(p => `${p.name} (${p.quantity})`).join(', ');
+
+                                                        return (
+                                                            <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
+                                                                <td style={{ padding: '10px' }}>
+                                                                    <div style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{d.number}</div>
+                                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{d.location}</div>
+                                                                </td>
+                                                                <td style={{ padding: '10px', textAlign: 'center', color: getCount('Moscas') > 0 ? 'var(--accent-color)' : '#ccc' }}>
+                                                                    {getCount('Moscas')}
+                                                                </td>
+                                                                <td style={{ padding: '10px', textAlign: 'center', color: getCount('Mosquitos') > 0 ? 'var(--accent-color)' : '#ccc' }}>
+                                                                    {getCount('Mosquitos')}
+                                                                </td>
+                                                                <td style={{ padding: '10px', textAlign: 'center', color: getCount('Mariposas') > 0 ? 'var(--accent-color)' : '#ccc' }}>
+                                                                    {getCount('Mariposas')}
+                                                                </td>
+                                                                <td style={{ padding: '10px', color: '#666' }}>{outros || '-'}</td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        </div>
                     )}
                 </div>
 
+                {/* Persistent Footer Actions */}
                 {/* Persistent Footer Actions */}
                 <div style={{ padding: '15px', background: 'var(--bg-element)', borderTop: '1px solid #ddd', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     <button
@@ -810,11 +1169,11 @@ const Activities = () => {
 
                     <div style={{ display: 'flex', gap: '10px' }}>
                         <button
-                            onClick={() => alert('Aprovação da OS solicitada')}
+                            onClick={handleOpenSignatureModal}
                             style={{
                                 flex: 1,
                                 padding: '12px',
-                                background: '#fd7e14',
+                                background: signatureData ? '#8e44ad' : '#f39c12',
                                 color: 'white',
                                 border: 'none',
                                 borderRadius: '8px',
@@ -824,7 +1183,7 @@ const Activities = () => {
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
                             }}
                         >
-                            <i className='bx bx-check-double'></i> Aprovar
+                            <i className='bx bx-pencil'></i> {signatureData ? 'Assinado' : 'Aprovar'}
                         </button>
 
                         <button
@@ -839,17 +1198,180 @@ const Activities = () => {
                                 fontWeight: 'bold',
                                 fontSize: '1rem',
                                 cursor: 'pointer',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                opacity: !signatureData ? 0.6 : 1,
+                                pointerEvents: !signatureData ? 'none' : 'auto'
                             }}
                         >
                             <i className='bx bx-check-circle'></i> Finalizar
                         </button>
                     </div>
                 </div>
-            </div>
+
+                {/* Signature Modal */}
+                {
+                    showSignatureModal && (
+                        <div className="modal-overlay" style={{
+                            position: 'fixed',
+                            top: 0, left: 0, right: 0, bottom: 0,
+                            background: 'rgba(0,0,0,0.8)',
+                            zIndex: 1000,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            <div style={{
+                                background: 'white',
+                                padding: '20px',
+                                borderRadius: '10px',
+                                width: '90%',
+                                maxWidth: '400px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '15px'
+                            }}>
+                                <h3 style={{ margin: 0, color: '#333', textAlign: 'center' }}>Assinatura do Cliente</h3>
+
+                                <div style={{ background: '#f9f9f9' }}>
+                                    <SignaturePad onChange={setTempSignature} />
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <button onClick={saveSignature} style={{ flex: 1, padding: '10px', background: '#2ecc71', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>Confirmar</button>
+                                </div>
+                                <button onClick={() => setShowSignatureModal(false)} style={{ marginTop: '5px', background: 'transparent', border: 'none', color: '#666', cursor: 'pointer', textDecoration: 'underline' }}>Cancelar</button>
+                            </div>
+                        </div>
+                    )
+                }
+
+                {/* Pest Count Modal */}
+                {
+                    showPestCountModal && (
+                        <div style={{
+                            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+                            background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100
+                        }}>
+                            <div style={{
+                                background: 'white',
+                                borderRadius: '10px',
+                                width: '90%',
+                                maxWidth: '500px',
+                                maxHeight: '80vh',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                overflow: 'hidden'
+                            }}>
+                                {/* Header */}
+                                <div style={{ padding: '15px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Contagem de Pragas</h3>
+                                    <i className='bx bx-x' style={{ fontSize: '1.5rem', cursor: 'pointer' }} onClick={() => setShowPestCountModal(false)}></i>
+                                </div>
+
+                                {/* Body */}
+                                <div style={{ padding: '15px', overflowY: 'auto' }}>
+                                    {!currentCountingDevice ? (
+                                        // List View
+                                        <>
+                                            <p style={{ color: '#666', marginBottom: '15px' }}>
+                                                É obrigatório realizar a contagem de todos os dispositivos listados.
+                                                <span style={{ color: '#e74c3c', fontWeight: 'bold', marginLeft: '5px' }}>
+                                                    Pendentes: {getPendingCountDevices().length}
+                                                </span>
+                                            </p>
+
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }}>
+                                                {getPendingCountDevices().map((d, i) => (
+                                                    <button
+                                                        key={i}
+                                                        onClick={() => handleOpenPestCount(d, d.serviceId)}
+                                                        style={{
+                                                            padding: '10px',
+                                                            border: '1px solid #ccc',
+                                                            borderRadius: '8px',
+                                                            background: '#fff',
+                                                            cursor: 'pointer',
+                                                            textAlign: 'center'
+                                                        }}
+                                                    >
+                                                        <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#333' }}>Armadilha luminosa {d.number}</div>
+                                                        <div style={{ fontSize: '0.8rem', color: '#666' }}>{d.serviceType}</div>
+                                                    </button>
+                                                ))}
+                                                {getPendingCountDevices().length === 0 && (
+                                                    <div style={{ gridColumn: '1/-1', textAlign: 'center', color: '#2ecc71', padding: '20px' }}>
+                                                        <i className='bx bx-check-circle' style={{ fontSize: '2rem' }}></i>
+                                                        <p>Todas as contagens realizadas!</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        // Detail View
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '5px' }}>
+                                                <i className='bx bx-arrow-back' style={{ cursor: 'pointer', fontSize: '1.2rem' }} onClick={() => setCurrentCountingDevice(null)}></i>
+                                                <h4 style={{ margin: 0 }}>Armadilha luminosa {currentCountingDevice.number}</h4>
+                                            </div>
+
+                                            {['Moscas', 'Mosquitos', 'Mariposas'].map(pest => (
+                                                <div key={pest} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                    <span style={{ color: '#333' }}>{pest}</span>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                        <button
+                                                            onClick={() => updatePestCount(pest, -1)}
+                                                            style={{ width: '30px', height: '30px', borderRadius: '50%', border: 'none', background: '#ddd', fontSize: '1.2rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                        >−</button>
+                                                        <input
+                                                            type="number"
+                                                            value={pestCountForm[pest]}
+                                                            onChange={(e) => setPestCountForm(prev => ({ ...prev, [pest]: parseInt(e.target.value) || 0 }))}
+                                                            style={{ width: '50px', padding: '5px', textAlign: 'center', borderRadius: '4px', border: '1px solid #ccc' }}
+                                                        />
+                                                        <button
+                                                            onClick={() => updatePestCount(pest, 1)}
+                                                            style={{ width: '30px', height: '30px', borderRadius: '50%', border: 'none', background: '#ddd', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                        >+</button>
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            <button
+                                                onClick={handleSavePestCount}
+                                                style={{
+                                                    marginTop: '10px',
+                                                    padding: '12px',
+                                                    background: '#2ecc71',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '8px',
+                                                    fontWeight: 'bold',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '5px'
+                                                }}
+                                            >
+                                                <i className='bx bx-save'></i> Salvar Contagem
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Footer */}
+                                <div style={{ padding: '15px', borderTop: '1px solid #eee', background: '#f9f9f9', display: 'flex', justifyContent: 'flex-end' }}>
+                                    <button onClick={() => setShowPestCountModal(false)} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid #ddd', background: '#fff', cursor: 'pointer', color: '#666' }}>
+                                        Fechar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
+            </div >
         );
     }
-
     // Default View (List of scheduled OS) - "Minha Agenda"
     return (
         <div className="calendar-app" style={{ overflowY: 'auto', height: '100vh', display: 'flex', flexDirection: 'column' }}>

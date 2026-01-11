@@ -218,6 +218,12 @@ const CalendarApp = () => {
       return;
     }
 
+    if (!selectedClient) {
+      setAlertMessage("Por favor, selecione um cliente para o agendamento.");
+      setShowAlertDialog(true);
+      return;
+    }
+
     const startMinutes = parseInt(eventStartTime.hours) * 60 + parseInt(eventStartTime.minutes);
     const endMinutes = parseInt(eventEndTime.hours) * 60 + parseInt(eventEndTime.minutes);
 
@@ -720,21 +726,6 @@ const CalendarApp = () => {
         <div className="modal-overlay">
           <div className="event-popup">
             <div className="event-popup-header">
-              <div className="popup-client-wrapper">
-                <label className="popup-client-label">Cliente</label>
-                <select
-                  className="popup-client-select"
-                  value={selectedClient}
-                  onChange={(e) => setSelectedClient(e.target.value)}
-                >
-                  <option value="">Selecione um cliente...</option>
-                  {clients.map(client => (
-                    <option key={client.id} value={client.id}>
-                      {client.fantasy_name || client.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
               <div className="header-date">
                 {selectedDate.toLocaleDateString('pt-BR', { weekday: 'long' }).charAt(0).toUpperCase() + selectedDate.toLocaleDateString('pt-BR', { weekday: 'long' }).slice(1)}, {selectedDate.getDate()} de {monthOfYear[selectedDate.getMonth()]} de {selectedDate.getFullYear()}
               </div>
@@ -874,16 +865,27 @@ const CalendarApp = () => {
               </div>
             </div>
 
-            <textarea
-              className="popup-text-input"
-              placeholder="Digite o texto do evento (Máximo 60 caracteres)"
-              value={eventText}
-              onChange={(e) => {
-                if (e.target.value.length <= 60) {
-                  setEventText(e.target.value);
-                }
-              }}
-            ></textarea>
+            <div className="popup-client-wrapper" style={{ padding: '0 24px' }}>
+              <label className="popup-client-label">
+                Cliente <span style={{ color: '#ff4d4d', marginLeft: '4px' }}>*</span>
+              </label>
+              <select
+                className="popup-client-select"
+                value={selectedClient}
+                onChange={(e) => setSelectedClient(e.target.value)}
+                style={{
+                  border: selectedClient ? '1px solid rgba(255, 255, 255, 0.3)' : '1px solid var(--accent-color)',
+                  boxShadow: !selectedClient ? '0 0 5px rgba(0, 123, 255, 0.3)' : 'none'
+                }}
+              >
+                <option value="">Selecione um Cliente...</option>
+                {clients.map(client => (
+                  <option key={client.id} value={client.id}>
+                    {client.fantasy_name || client.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <div className="event-popup-buttons">
               <button className="cancel-btn" onClick={() => setShowEventPopup(false)}>Cancelar</button>
@@ -892,18 +894,21 @@ const CalendarApp = () => {
 
           </div>
         </div>
-      )}
-      {showAlertDialog && (
-        <div className="modal-overlay">
-          <div className="alert-popup">
-            <div className="alert-icon">
-              <i className='bx bx-error-circle'></i>
+      )
+      }
+      {
+        showAlertDialog && (
+          <div className="modal-overlay">
+            <div className="alert-popup">
+              <div className="alert-icon">
+                <i className='bx bx-error-circle'></i>
+              </div>
+              <div className="alert-message">{alertMessage}</div>
+              <button className="alert-ok-btn" onClick={() => setShowAlertDialog(false)}>OK</button>
             </div>
-            <div className="alert-message">{alertMessage}</div>
-            <button className="alert-ok-btn" onClick={() => setShowAlertDialog(false)}>OK</button>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {
         showServiceModal && selectedServiceEvent && (() => {
