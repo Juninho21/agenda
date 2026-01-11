@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "../supabaseClient";
+import { useNavigate } from 'react-router-dom';
 
 
 
 const CalendarApp = () => {
+  const navigate = useNavigate();
   const dayOfWeek = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   const monthOfYear = [
     "Janeiro",
@@ -40,6 +42,8 @@ const CalendarApp = () => {
 
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState("");
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [selectedServiceEvent, setSelectedServiceEvent] = useState(null);
 
 
   const currentEventTime = activeTimeField === 'start' ? eventStartTime : eventEndTime;
@@ -329,6 +333,37 @@ const CalendarApp = () => {
     setActiveTimeField("start");
   };
 
+  const handleCardClick = (event) => {
+    setSelectedServiceEvent(event);
+    setShowServiceModal(true);
+  };
+
+  const handleStartOS = () => {
+    // Navigate to Activities page, passing the selected event/client context if needed
+    // Assuming Activities page can handle location state or params
+    // For now, just navigating as requested.
+    // Enhanced: Pass the client ID and event ID to pre-select or load context
+    const client = selectedServiceEvent.client_id ? clients.find(c => c.id === selectedServiceEvent.client_id) : null;
+
+    navigate('/activities', {
+      state: {
+        eventId: selectedServiceEvent.id,
+        clientId: selectedServiceEvent.client_id,
+        clientName: client ? (client.fantasy_name || client.name) : '',
+        description: selectedServiceEvent.text
+      }
+    });
+
+    setShowServiceModal(false);
+  };
+
+  const handleNonAttendance = () => {
+    // Logic to register non-attendance
+    console.log("Registrar Não Atendimento for event:", selectedServiceEvent);
+    alert("Funcionalidade 'Registrar Não Atendimento' será implementada em breve.");
+    setShowServiceModal(false);
+  };
+
   const handleEditEvent = (event) => {
     setSelectedDate(new Date(event.date));
 
@@ -610,7 +645,7 @@ const CalendarApp = () => {
               .map((event, index) => {
                 const client = event.client_id ? clients.find(c => c.id === event.client_id) : null;
                 return (
-                  <div className="event" key={index}>
+                  <div className="event" key={index} onClick={() => handleCardClick(event)} style={{ cursor: 'pointer' }}>
                     <div className="event-date-wrapper" style={{ minWidth: '130px' }}>
                       {client && client.code && (
                         <div style={{
@@ -662,11 +697,17 @@ const CalendarApp = () => {
                     <div className="event-buttons">
                       <i
                         className="bx bxs-edit-alt"
-                        onClick={() => handleEditEvent(event)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditEvent(event);
+                        }}
                       ></i>
                       <i
                         className="bx bxs-message-alt-x"
-                        onClick={() => handleDeleteEvent(event.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteEvent(event.id);
+                        }}
                       ></i>
                     </div>
                   </div>
@@ -863,7 +904,110 @@ const CalendarApp = () => {
           </div>
         </div>
       )}
-    </div>
+
+      {
+        showServiceModal && selectedServiceEvent && (() => {
+          const client = selectedServiceEvent.client_id ? clients.find(c => c.id === selectedServiceEvent.client_id) : null;
+          return (
+            <div className="modal-overlay">
+              <div className="event-popup" style={{ maxWidth: '90%', width: '400px', height: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+                  <h3 style={{ margin: 0, color: 'var(--text-primary)' }}>Detalhes do Agendamento</h3>
+                  <i className='bx bx-x' style={{ fontSize: '1.5rem', cursor: 'pointer', color: 'var(--text-secondary)' }} onClick={() => setShowServiceModal(false)}></i>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <i className='bx bx-calendar' style={{ fontSize: '1.2rem', color: 'var(--accent-color)' }}></i>
+                    <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
+                      {`${selectedServiceEvent.date.getDate()} de ${monthOfYear[selectedServiceEvent.date.getMonth()]} de ${selectedServiceEvent.date.getFullYear()}`}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <i className='bx bx-time' style={{ fontSize: '1.2rem', color: 'var(--accent-color)' }}></i>
+                    <span style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>
+                      {selectedServiceEvent.start_time || selectedServiceEvent.startTime || selectedServiceEvent.time} - {selectedServiceEvent.end_time || selectedServiceEvent.endTime}
+                    </span>
+                  </div>
+                  {selectedServiceEvent.text && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <i className='bx bx-notepad' style={{ fontSize: '1.2rem', color: 'var(--accent-color)' }}></i>
+                      <span style={{ fontSize: '1.1rem' }}>{selectedServiceEvent.text}</span>
+                    </div>
+                  )}
+                </div>
+
+                {client && (
+                  <div style={{ padding: '15px', backgroundColor: 'var(--bg-color)', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--accent-color)' }}>{client.fantasy_name || client.name}</span>
+                      {client.code && <span style={{ fontSize: '0.8rem', backgroundColor: 'var(--accent-color)', color: '#fff', padding: '2px 6px', borderRadius: '4px' }}>{client.code}</span>}
+                    </div>
+                    {client.phone && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
+                        <i className='bx bxs-phone'></i>
+                        <span>{client.phone}</span>
+                      </div>
+                    )}
+                    {(client.street || client.city) && (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', color: 'var(--text-secondary)' }}>
+                        <i className='bx bxs-map' style={{ marginTop: '3px' }}></i>
+                        <span style={{ fontSize: '0.9rem' }}>
+                          {client.street}{client.number ? `, ${client.number}` : ''}
+                          {client.neighborhood ? ` - ${client.neighborhood}` : ''}
+                          {client.city ? ` - ${client.city}` : ''}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+                  <button
+                    onClick={handleStartOS}
+                    style={{
+                      padding: '12px',
+                      backgroundColor: '#4CAF50',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '1rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <i className='bx bx-play-circle'></i> Iniciar OS
+                  </button>
+                  <button
+                    onClick={handleNonAttendance}
+                    style={{
+                      padding: '12px',
+                      backgroundColor: '#FF5722',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '1rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <i className='bx bx-x-circle'></i> Registrar Não Atendimento
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()
+      }
+    </div >
   );
 };
 
