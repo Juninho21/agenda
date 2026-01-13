@@ -503,36 +503,74 @@ const Activities = () => {
 
             // --- Logo & Title ---
             // If we have a logo URL in companySettings, use it.
-            // We'll need to fetch the image data first to ensure it renders in the PDF.
+            // Helper to load and compress image
+            const compressImage = (url, maxWidth = 500) => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.crossOrigin = 'Anonymous';
+                    img.src = url;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > maxWidth) {
+                            height = Math.round((height * maxWidth) / width);
+                            width = maxWidth;
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        // Use JPEG for better compression if transparency isn't critical, 
+                        // or PNG if it is. For signatures, we might want PNG, but for Logo/Photos JPEG is smaller.
+                        // However, signatures are usually small line drawings, so PNG is fine if resized small enough.
+                        // Let's use PNG to preserve quality/transparency but rely on the resizing to reduce size.
+                        resolve(canvas.toDataURL('image/png'));
+                    };
+                    img.onerror = () => resolve(null);
+                });
+            };
+
+            const loadImage = async (url, maxWidth = 300) => {
+                if (!url) return null;
+                try {
+                    // Check if it's a blob URL (local) or data URL
+                    if (url.startsWith('data:')) {
+                        return compressImage(url, maxWidth);
+                    }
+                    const response = await fetch(url);
+                    const blob = await response.blob();
+                    const reader = new FileReader();
+                    return new Promise((resolve) => {
+                        reader.onloadend = () => {
+                            resolve(compressImage(reader.result, maxWidth));
+                        };
+                        reader.readAsDataURL(blob);
+                    });
+                } catch (e) {
+                    console.warn("Failed to load image", e);
+                    return null;
+                }
+            };
+
+            // --- Logo ---
             let logoDataUrl = null;
             if (companySettings?.logo_url) {
-                try {
-                    // Check if it is already a data URL or a remote URL
-                    if (companySettings.logo_url.startsWith('data:')) {
-                        logoDataUrl = companySettings.logo_url;
-                    } else {
-                        // Fetch remote image
-                        const response = await fetch(companySettings.logo_url);
-                        const blob = await response.blob();
-                        logoDataUrl = await new Promise((resolve) => {
-                            const reader = new FileReader();
-                            reader.onloadend = () => resolve(reader.result);
-                            reader.readAsDataURL(blob);
-                        });
-                    }
-                } catch (e) {
-                    console.warn("Failed to load logo image", e);
-                }
+                logoDataUrl = await loadImage(companySettings.logo_url, 500);
             }
+
+            // ... (Logo rendering remains, relying on logoDataUrl)
 
             if (logoDataUrl) {
                 // Determine dimensions to maintain aspect ratio
-                // Create a temporary image to get natural dimensions
                 const imgProps = await new Promise((resolve) => {
                     const img = new Image();
                     img.src = logoDataUrl;
                     img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-                    img.onerror = () => resolve(null); // Fallback
+                    img.onerror = () => resolve(null);
                 });
 
                 let pdfLogoWidth = 50;
@@ -546,10 +584,8 @@ const Activities = () => {
                     pdfLogoHeight = imgProps.height * ratio;
                 }
 
-                // Add Logo with calculated dimensions
                 doc.addImage(logoDataUrl, 'PNG', 14, 10, pdfLogoWidth, pdfLogoHeight, undefined, 'FAST');
             }
-            // Removed fallback text as logo is mandatory
 
             doc.setFontSize(16);
             doc.text("Ordem De Serviço", 105, 22, { align: 'center' });
@@ -720,33 +756,15 @@ const Activities = () => {
             doc.setDrawColor(0); // Reset draw color to black for signature lines
             doc.setFontSize(10); // Ensure consistent font size
 
-            // Pre-load signatures
+            // Pre-load signatures using the compressed image loader
             let techSigDataUrl = null;
             let pestSigDataUrl = null;
 
-            // Helper to load image
-            const loadImage = async (url) => {
-                if (!url) return null;
-                try {
-                    if (url.startsWith('data:')) return url;
-                    const response = await fetch(url);
-                    const blob = await response.blob();
-                    return new Promise((resolve) => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result);
-                        reader.readAsDataURL(blob);
-                    });
-                } catch (e) {
-                    console.warn("Failed to load signature", e);
-                    return null;
-                }
-            };
-
             if (companySettings?.technical_responsible_signature_url) {
-                techSigDataUrl = await loadImage(companySettings.technical_responsible_signature_url);
+                techSigDataUrl = await loadImage(companySettings.technical_responsible_signature_url, 300);
             }
             if (companySettings?.pest_controller_signature_url) {
-                pestSigDataUrl = await loadImage(companySettings.pest_controller_signature_url);
+                pestSigDataUrl = await loadImage(companySettings.pest_controller_signature_url, 300);
             }
 
             // Move the signature line down significantly to accommodate the image above it
