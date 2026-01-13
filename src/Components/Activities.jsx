@@ -663,8 +663,10 @@ const Activities = () => {
                 head: [['Serviço', 'Praga Alvo', 'Local']],
                 body: serviceTableData,
                 theme: 'grid',
-                headStyles: { fillColor: primaryColor, textColor: 255, halign: 'center', fontSize: 9, fontStyle: 'bold' },
-                bodyStyles: { fontSize: 9, halign: 'center' },
+                headStyles: { fillColor: primaryColor, textColor: 255, halign: 'center', fontSize: 9, fontStyle: 'bold', lineWidth: 0.1, lineColor: [0, 0, 0] },
+                bodyStyles: { fontSize: 9, halign: 'center', lineWidth: 0.1, lineColor: [0, 0, 0] },
+                tableLineColor: [0, 0, 0],
+                tableLineWidth: 0.1,
                 margin: { left: 14, right: 14 }
             });
             currentY = doc.lastAutoTable.finalY + 10;
@@ -698,8 +700,10 @@ const Activities = () => {
                     head: [['Produto', 'Princípio Ativo', 'Grupo Químico', 'Registro', 'Lote', 'Validade', 'Quantidade', 'Diluente', 'Antídoto']],
                     body: productTableData,
                     theme: 'grid',
-                    headStyles: { fillColor: primaryColor, textColor: 255, halign: 'center', fontSize: 8, fontStyle: 'bold' },
-                    bodyStyles: { fontSize: 8, halign: 'center', cellPadding: 2 },
+                    headStyles: { fillColor: primaryColor, textColor: 255, halign: 'center', fontSize: 8, fontStyle: 'bold', lineWidth: 0.1, lineColor: [0, 0, 0] },
+                    bodyStyles: { fontSize: 8, halign: 'center', cellPadding: 2, lineWidth: 0.1, lineColor: [0, 0, 0] },
+                    tableLineColor: [0, 0, 0],
+                    tableLineWidth: 0.1,
                     margin: { left: 14, right: 14 }
                 });
                 currentY = doc.lastAutoTable.finalY + 10;
