@@ -490,7 +490,8 @@ const Activities = () => {
 
     const generatePDF = async (services, clientInfo, checkIn, checkOut, clientSignature) => {
         try {
-            const doc = new jsPDF();
+            // Enable compression to match Desktop file size standards on Android
+            const doc = new jsPDF({ compress: true });
 
             const safeClientName = clientInfo?.clientName || 'Cliente';
             const safeAddress = clientInfo?.address || '';
@@ -504,7 +505,7 @@ const Activities = () => {
             // --- Logo & Title ---
             // If we have a logo URL in companySettings, use it.
             // Helper to load and compress image
-            const compressImage = (url, maxWidth = 500) => {
+            const compressImage = (url, maxWidth = 500, format = 'image/png', quality = 0.8) => {
                 return new Promise((resolve) => {
                     const img = new Image();
                     img.crossOrigin = 'Anonymous';
@@ -522,13 +523,20 @@ const Activities = () => {
                         canvas.width = width;
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
+
+                        // Fill white background for JPEGs (transparency turns black otherwise)
+                        if (format === 'image/jpeg') {
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.fillRect(0, 0, width, height);
+                        }
+
                         ctx.drawImage(img, 0, 0, width, height);
 
                         // Use JPEG for better compression if transparency isn't critical, 
                         // or PNG if it is. For signatures, we might want PNG, but for Logo/Photos JPEG is smaller.
                         // However, signatures are usually small line drawings, so PNG is fine if resized small enough.
                         // Let's use PNG to preserve quality/transparency but rely on the resizing to reduce size.
-                        resolve(canvas.toDataURL('image/png'));
+                        resolve(canvas.toDataURL(format, quality));
                     };
                     img.onerror = () => resolve(null);
                 });
