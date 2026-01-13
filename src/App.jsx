@@ -10,6 +10,7 @@ import CompanySettings from "./Components/CompanySettings"
 import Products from "./Components/Products"
 import Clients from "./Components/Clients"
 import UserManagement from "./Components/UserManagement"
+import Quotes from "./Components/Quotes"
 import './Components/CalendarApp.css'
 
 import Layout from "./Components/Layout"
@@ -56,6 +57,7 @@ const App = () => {
           <Route path="/settings/clients" element={<Clients />} />
           <Route path="/settings/products" element={<Products />} />
           <Route path="/settings/users" element={<UserManagement />} />
+          <Route path="/settings/quotes" element={<Quotes />} />
         </Route>
       </Routes>
     </Router>
