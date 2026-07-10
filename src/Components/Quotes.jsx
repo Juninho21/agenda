@@ -222,16 +222,16 @@ const Quotes = () => {
                 doc.addImage(logoDataUrl, 'PNG', 14, 10, pdfLogoWidth, pdfLogoHeight, undefined, 'FAST');
             }
 
-            doc.setFontSize(16);
-            doc.text("ORÇAMENTO", 105, 22, { align: 'center' });
+            doc.setFontSize(18);
+            doc.text("ORÇAMENTO", 195, 20, { align: 'right' });
 
             const currentDate = new Date();
             doc.setFontSize(10);
-            doc.text(`Data: ${format(currentDate, 'dd/MM/yyyy')}`, 195, 15, { align: 'right' });
-            doc.text(`Validade: 30 dias`, 195, 20, { align: 'right' });
+            doc.text(`Data: ${format(currentDate, 'dd/MM/yyyy')}`, 195, 28, { align: 'right' });
+            doc.text(`Validade: 30 dias`, 195, 33, { align: 'right' });
 
             // --- Company Info ---
-            const startY = 35;
+            const startY = 45;
             doc.setFontSize(9);
             doc.setFont('helvetica', 'normal');
 

@@ -586,14 +586,14 @@ const Activities = () => {
                 doc.addImage(logoDataUrl, 'PNG', 14, 10, pdfLogoWidth, pdfLogoHeight, undefined, 'FAST');
             }
 
-            doc.setFontSize(16);
-            doc.text("Ordem De Serviço", 105, 22, { align: 'center' });
+            doc.setFontSize(18);
+            doc.text("Ordem De Serviço", 195, 20, { align: 'right' });
 
             doc.setFontSize(10);
-            doc.text(`Nº O.S.: ${safeId}`, 195, 15, { align: 'right' });
+            doc.text(`Nº O.S.: ${safeId}`, 195, 28, { align: 'right' });
 
             // --- Company & Date Info ---
-            const startY = 35;
+            const startY = 45;
             doc.setFontSize(9);
             doc.setFont('helvetica', 'normal');
 
