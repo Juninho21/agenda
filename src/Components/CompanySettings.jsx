@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { db, auth, storage } from '../firebaseClient';
+import { db, auth } from '../firebaseClient';
 import { collection, doc, setDoc, getDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import SignaturePad from './SignaturePad';
 import './CalendarApp.css'; // Reusing general styles
 
@@ -143,7 +142,7 @@ const CompanySettings = () => {
             if (lastItem) {
                 // Map the queue item to DB columns, filtering out extra cache keys
                 const dbPayload = {
-                    user_id: user.id,
+                    user_id: user.uid,
                     name: lastItem.name,
                     cnpj: lastItem.cnpj,
                     phone: lastItem.phone,
@@ -160,15 +159,12 @@ const CompanySettings = () => {
                     technical_responsible_crea: lastItem.technical_responsible_crea || lastItem.technicalResponsibleCrea,
                     technical_responsible_phone: lastItem.technical_responsible_phone || lastItem.technicalResponsiblePhone,
                     technical_responsible_email: lastItem.technical_responsible_email || lastItem.technicalResponsibleEmail,
-                    // If signature was a base64 string in queue, we can't easily upload it here without logic. 
-                    // Ideally we skip it or only sync if it was a URL.
-                    // For now, if it starts with http, use it. If data:, ignore or it'll fail/store huge string if text column allowed.
-                    technical_responsible_signature_url: (lastItem.technical_responsible_signature_url && lastItem.technical_responsible_signature_url.startsWith('http')) ? lastItem.technical_responsible_signature_url : null,
+                    technical_responsible_signature_url: lastItem.technical_responsible_signature_url || null,
                     pest_controller_name: lastItem.pest_controller_name || lastItem.pestControllerName,
                     pest_controller_phone: lastItem.pest_controller_phone || lastItem.pestControllerPhone,
                     pest_controller_email: lastItem.pest_controller_email || lastItem.pestControllerEmail,
-                    pest_controller_signature_url: (lastItem.pest_controller_signature_url && lastItem.pest_controller_signature_url.startsWith('http')) ? lastItem.pest_controller_signature_url : null,
-                    logo_url: (lastItem.logo_url && lastItem.logo_url.startsWith('http')) ? lastItem.logo_url : null
+                    pest_controller_signature_url: lastItem.pest_controller_signature_url || null,
+                    logo_url: lastItem.logo_url || null
                 };
 
                 await setDoc(doc(db, 'company_settings', user.uid), dbPayload, { merge: true });
@@ -356,52 +352,57 @@ const CompanySettings = () => {
             }
 
             // Online Mode
-            // Upload Logo if changed
-            if (logoFile) {
-                const fileExt = logoFile.name.split('.').pop();
-                const fileName = `${user.uid}-${Math.random()}.${fileExt}`;
-                const filePath = `${fileName}`;
+            const compressFileToBase64 = (file, maxWidth = 500) => {
+                return new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = (event) => {
+                        const img = new Image();
+                        img.src = event.target.result;
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            let width = img.width;
+                            let height = img.height;
+                            if (width > maxWidth) {
+                                height = Math.round((height * maxWidth) / width);
+                                width = maxWidth;
+                            }
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            // Fundo branco caso seja PNG transparente para evitar fundo preto no JPEG
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.fillRect(0, 0, width, height);
+                            ctx.drawImage(img, 0, 0, width, height);
+                            resolve(canvas.toDataURL('image/jpeg', 0.8)); 
+                        };
+                        img.onerror = () => resolve(null);
+                    };
+                    reader.onerror = () => resolve(null);
+                });
+            };
 
-                const storageRef = ref(storage, `company-logos/${filePath}`);
-                await uploadBytes(storageRef, logoFile);
-                logoUrl = await getDownloadURL(storageRef);
-                settingsData.logo_url = logoUrl; // update url
+            // Process Logo
+            if (logoFile) {
+                logoUrl = await compressFileToBase64(logoFile, 500);
+                settingsData.logo_url = logoUrl;
             } else if (logoPreview === null) {
-                // If logo was removed
                 logoUrl = null;
                 settingsData.logo_url = null;
             }
 
-            // Upload Tech Signature
-            if (signatureUrl && typeof signatureUrl === 'string' && signatureUrl.startsWith('data:')) {
-                const blob = await (await fetch(signatureUrl)).blob();
-                const fileExt = 'png';
-                const fileName = `sig-${user.uid}-${Math.random()}.${fileExt}`;
-                const filePath = `signatures/${fileName}`;
-
-                const storageRef = ref(storage, `company-logos/${filePath}`);
-                await uploadBytes(storageRef, blob);
-                signatureUrl = await getDownloadURL(storageRef);
-                settingsData.technical_responsible_signature_url = signatureUrl;
-            } else if (signatureUrl === null) {
+            // Process Signatures (They are already Base64 from the canvas component)
+            if (signatureUrl === null) {
                 settingsData.technical_responsible_signature_url = null;
+            } else {
+                settingsData.technical_responsible_signature_url = signatureUrl;
             }
 
-            // Upload Pest Controller Signature
-            if (pestSignatureUrl && typeof pestSignatureUrl === 'string' && pestSignatureUrl.startsWith('data:')) {
-                const blob = await (await fetch(pestSignatureUrl)).blob();
-                const fileExt = 'png';
-                const fileName = `pest-sig-${user.uid}-${Math.random()}.${fileExt}`;
-                const filePath = `signatures/${fileName}`;
-
-                const storageRef = ref(storage, `company-logos/${filePath}`);
-                await uploadBytes(storageRef, blob);
-                pestSignatureUrl = await getDownloadURL(storageRef);
-                settingsData.pest_controller_signature_url = pestSignatureUrl;
-            } else if (pestSignatureUrl === null) {
+            if (pestSignatureUrl === null) {
                 settingsData.pest_controller_signature_url = null;
+            } else {
+                settingsData.pest_controller_signature_url = pestSignatureUrl;
             }
-
 
             // Update cache with new URLs
             localStorage.setItem('cached_company_settings', JSON.stringify(settingsData));
