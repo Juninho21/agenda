@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { db, auth, storage } from '../firebaseClient';
+import { collection, doc, setDoc, getDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import SignaturePad from './SignaturePad';
 import './CalendarApp.css'; // Reusing general styles
 
@@ -71,20 +73,14 @@ const CompanySettings = () => {
                     }
                 }
 
-                const { data: { user } } = await supabase.auth.getUser();
+                const user = auth.currentUser;
 
                 if (user) {
-                    const { data, error } = await supabase
-                        .from('company_settings')
-                        .select('*')
-                        .eq('user_id', user.id)
-                        .single();
+                    const docRef = doc(db, 'company_settings', user.uid);
+                    const docSnap = await getDoc(docRef);
 
-                    if (error) {
-                        if (error.code !== 'PGRST116') {
-                            console.error('Error fetching settings:', error);
-                        }
-                    } else if (data) {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
                         setFormData({
                             name: data.name || '',
                             cnpj: data.cnpj || '',
@@ -138,7 +134,7 @@ const CompanySettings = () => {
         console.log("Processing settings sync queue:", queue);
 
         try {
-            const { data: { user } } = await supabase.auth.getUser();
+            const user = auth.currentUser;
             if (!user) return;
 
             // Process the last item
@@ -175,11 +171,7 @@ const CompanySettings = () => {
                     logo_url: (lastItem.logo_url && lastItem.logo_url.startsWith('http')) ? lastItem.logo_url : null
                 };
 
-                const { error } = await supabase
-                    .from('company_settings')
-                    .upsert(dbPayload, { onConflict: 'user_id' });
-
-                if (error) throw error;
+                await setDoc(doc(db, 'company_settings', user.uid), dbPayload, { merge: true });
             }
 
             // Clear queue after success
@@ -294,7 +286,7 @@ const CompanySettings = () => {
     const handleSave = async () => {
         setLoading(true);
         try {
-            const { data: { user } } = await supabase.auth.getUser();
+            const user = auth.currentUser;
 
             let logoUrl = logoPreview;
             let signatureUrl = formData.technicalResponsibleSignature;
@@ -370,19 +362,9 @@ const CompanySettings = () => {
                 const fileName = `${user.id}-${Math.random()}.${fileExt}`;
                 const filePath = `${fileName}`;
 
-                const { error: uploadError } = await supabase.storage
-                    .from('company-logos')
-                    .upload(filePath, logoFile);
-
-                if (uploadError) {
-                    throw uploadError;
-                }
-
-                const { data: { publicUrl } } = supabase.storage
-                    .from('company-logos')
-                    .getPublicUrl(filePath);
-
-                logoUrl = publicUrl;
+                const storageRef = ref(storage, `company-logos/${filePath}`);
+                await uploadBytes(storageRef, logoFile);
+                logoUrl = await getDownloadURL(storageRef);
                 settingsData.logo_url = logoUrl; // update url
             } else if (logoPreview === null) {
                 // If logo was removed
@@ -397,17 +379,9 @@ const CompanySettings = () => {
                 const fileName = `sig-${user.id}-${Math.random()}.${fileExt}`;
                 const filePath = `signatures/${fileName}`;
 
-                const { error: uploadError } = await supabase.storage
-                    .from('company-logos')
-                    .upload(filePath, blob);
-
-                if (uploadError) throw uploadError;
-
-                const { data: { publicUrl } } = supabase.storage
-                    .from('company-logos')
-                    .getPublicUrl(filePath);
-
-                signatureUrl = publicUrl;
+                const storageRef = ref(storage, `company-logos/${filePath}`);
+                await uploadBytes(storageRef, blob);
+                signatureUrl = await getDownloadURL(storageRef);
                 settingsData.technical_responsible_signature_url = signatureUrl;
             } else if (signatureUrl === null) {
                 settingsData.technical_responsible_signature_url = null;
@@ -420,17 +394,9 @@ const CompanySettings = () => {
                 const fileName = `pest-sig-${user.id}-${Math.random()}.${fileExt}`;
                 const filePath = `signatures/${fileName}`;
 
-                const { error: uploadError } = await supabase.storage
-                    .from('company-logos')
-                    .upload(filePath, blob);
-
-                if (uploadError) throw uploadError;
-
-                const { data: { publicUrl } } = supabase.storage
-                    .from('company-logos')
-                    .getPublicUrl(filePath);
-
-                pestSignatureUrl = publicUrl;
+                const storageRef = ref(storage, `company-logos/${filePath}`);
+                await uploadBytes(storageRef, blob);
+                pestSignatureUrl = await getDownloadURL(storageRef);
                 settingsData.pest_controller_signature_url = pestSignatureUrl;
             } else if (pestSignatureUrl === null) {
                 settingsData.pest_controller_signature_url = null;
@@ -441,10 +407,8 @@ const CompanySettings = () => {
             localStorage.setItem('cached_company_settings', JSON.stringify(settingsData));
 
             // Upsert Data
-            const { error } = await supabase
-                .from('company_settings')
-                .upsert({
-                    user_id: user.id,
+            await setDoc(doc(db, 'company_settings', user.uid), {
+                    user_id: user.uid,
                     name: formData.name,
                     cnpj: formData.cnpj,
                     phone: formData.phone,
@@ -467,9 +431,7 @@ const CompanySettings = () => {
                     pest_controller_email: formData.pestControllerEmail,
                     pest_controller_signature_url: pestSignatureUrl,
                     logo_url: logoUrl
-                }, { onConflict: 'user_id' });
-
-            if (error) throw error;
+                }, { merge: true });
 
             alert("Dados da empresa salvos com sucesso!");
 

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { db, auth } from '../firebaseClient';
+import { collection, getDocs, updateDoc, doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import './CalendarApp.css';
 
 const UserManagement = () => {
@@ -32,20 +34,18 @@ const UserManagement = () => {
     const checkPermission = async () => {
         setLoading(true);
         try {
-            const { data: { user } } = await supabase.auth.getUser();
+            const user = auth.currentUser;
             if (!user) {
                 navigate('/login');
                 return;
             }
 
             // Get profile to check role
-            const { data: profile, error } = await supabase
-                .from('profiles')
-                .select('role')
-                .eq('id', user.id)
-                .single();
+            const docRef = doc(db, 'profiles', user.uid);
+            const docSnap = await getDoc(docRef);
+            const profile = docSnap.exists() ? docSnap.data() : null;
 
-            if (error || !profile) {
+            if (!profile) {
                 alert('Erro ao verificar permissões.');
                 navigate('/settings');
                 return;
@@ -70,16 +70,11 @@ const UserManagement = () => {
     const fetchUsers = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('Error fetching users:', error);
-            } else {
-                setUsers(data || []);
-            }
+            const querySnapshot = await getDocs(collection(db, 'profiles'));
+            const data = querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+            // Firebase doesn't order by created_at by default unless we query it, but we can sort locally to keep it simple
+            data.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+            setUsers(data);
         } catch (error) {
             console.error('Error:', error);
         } finally {
@@ -99,52 +94,27 @@ const UserManagement = () => {
             // Since we are client-side only, we warn the user.
 
             // Attempt to create user
-            const { data, error } = await supabase.auth.signUp({
-                email: formData.email,
-                password: formData.password,
-                options: {
-                    data: {
-                        name: formData.name,
-                        role: formData.role // We can add this to metadata, but we rely on profiles table
-                    }
-                }
-            });
+            const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+            const newUser = userCredential.user;
 
-            if (error) throw error;
+            if (newUser) {
+                // Set the profile document for the new user in Firestore
+                await setDoc(doc(db, 'profiles', newUser.uid), {
+                    name: formData.name,
+                    role: formData.role,
+                    email: formData.email,
+                    created_at: new Date().toISOString()
+                });
 
-            if (data.user) {
-                // The trigger we created 'on_auth_user_created' adds the specific row to 'profiles' with default 'client'.
-                // We need to update that row with the correct Name and Role selected here.
-
-                // Wait a bit for trigger? Or just update immediately.
-                // Since RLS allows us (admin) to update, we try to update the profile.
-
-                const { error: updateError } = await supabase
-                    .from('profiles')
-                    .update({
-                        name: formData.name,
-                        role: formData.role
-                    })
-                    .eq('id', data.user.id);
-
-                if (updateError) {
-                    console.error('Error updating profile role:', updateError);
-                    alert('Usuário criado, mas houve um erro ao definir o perfil: ' + updateError.message);
-                } else {
-                    alert('Usuário cadastrado com sucesso!');
-                }
+                alert('Usuário cadastrado com sucesso!');
 
                 setView('list');
                 fetchUsers();
 
-                // IMPORTANT: If signUp logged us in as the new user, we are now that user.
-                // We check if our functionality is disrupted. 
-                // In many "new project" setups, signUp auto-signs in.
-                // If ID changed, we might need to re-login.
-                const { data: { user: newUser } } = await supabase.auth.getUser();
-                if (newUser.email === formData.email) {
+                // If signUp logged us in as the new user, we warn and log out.
+                if (auth.currentUser && auth.currentUser.uid === newUser.uid) {
                     alert('Atenção: O sistema autenticou automaticamente como o novo usuário. Você precisará fazer login novamente como Admin.');
-                    await supabase.auth.signOut();
+                    await signOut(auth);
                     navigate('/login');
                 }
             }
@@ -162,15 +132,10 @@ const UserManagement = () => {
 
         setLoading(true);
         try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({
-                    name: formData.name,
-                    role: formData.role
-                })
-                .eq('id', editingUser.id);
-
-            if (error) throw error;
+            await updateDoc(doc(db, 'profiles', editingUser.id), {
+                name: formData.name,
+                role: formData.role
+            });
 
             alert('Usuário atualizado com sucesso!');
             setView('list');
@@ -189,12 +154,7 @@ const UserManagement = () => {
 
         setLoading(true);
         try {
-            const { error } = await supabase
-                .from('profiles')
-                .delete()
-                .eq('id', userId);
-
-            if (error) throw error;
+            await deleteDoc(doc(db, 'profiles', userId));
 
             alert('Perfil de usuário removido.');
             fetchUsers();
