@@ -359,7 +359,7 @@ const CompanySettings = () => {
             // Upload Logo if changed
             if (logoFile) {
                 const fileExt = logoFile.name.split('.').pop();
-                const fileName = `${user.id}-${Math.random()}.${fileExt}`;
+                const fileName = `${user.uid}-${Math.random()}.${fileExt}`;
                 const filePath = `${fileName}`;
 
                 const storageRef = ref(storage, `company-logos/${filePath}`);
@@ -376,7 +376,7 @@ const CompanySettings = () => {
             if (signatureUrl && typeof signatureUrl === 'string' && signatureUrl.startsWith('data:')) {
                 const blob = await (await fetch(signatureUrl)).blob();
                 const fileExt = 'png';
-                const fileName = `sig-${user.id}-${Math.random()}.${fileExt}`;
+                const fileName = `sig-${user.uid}-${Math.random()}.${fileExt}`;
                 const filePath = `signatures/${fileName}`;
 
                 const storageRef = ref(storage, `company-logos/${filePath}`);
@@ -391,7 +391,7 @@ const CompanySettings = () => {
             if (pestSignatureUrl && typeof pestSignatureUrl === 'string' && pestSignatureUrl.startsWith('data:')) {
                 const blob = await (await fetch(pestSignatureUrl)).blob();
                 const fileExt = 'png';
-                const fileName = `pest-sig-${user.id}-${Math.random()}.${fileExt}`;
+                const fileName = `pest-sig-${user.uid}-${Math.random()}.${fileExt}`;
                 const filePath = `signatures/${fileName}`;
 
                 const storageRef = ref(storage, `company-logos/${filePath}`);
