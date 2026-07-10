@@ -1,0 +1,85 @@
+.app-header {
+    background-color: var(--bg-element, #161b22);
+    color: var(--text-primary, #fff);
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px;
+    /* 4px padding is common, but 8px usually better for touch targets near edges */
+    box-shadow: 0 4px 5px -2px rgba(0, 0, 0, 0.2), 0 7px 10px 1px rgba(0, 0, 0, 0.14), 0 2px 16px 1px rgba(0, 0, 0, 0.12);
+    /* Material Design Elevation 4 */
+    position: sticky;
+    /* Sticky enables it to stay top but respect parent layout */
+    top: 0;
+    z-index: 1000;
+    width: 100%;
+    box-sizing: border-box;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    overflow: hidden;
+}
+
+.header-title {
+    font-size: 1.25rem;
+    /* 20px - typical usage */
+    font-weight: 500;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: 'Roboto', sans-serif;
+    padding-left: 8px;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+
+.header-icon-btn {
+    background: transparent;
+    border: none;
+    color: inherit;
+    width: 48px;
+    /* Minimum touch target size */
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.5rem;
+    transition: background-color 0.2s;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.header-icon-btn:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.header-icon-btn:active {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Light Theme overrides */
+.light-theme .app-header {
+    background-color: var(--bg-element, #fff);
+    color: var(--text-primary, #1a202c);
+}
+
+.light-theme .header-icon-btn:hover {
+    background-color: rgba(0, 0, 0, 0.04);
+}
+
+.light-theme .header-icon-btn:active {
+    background-color: rgba(0, 0, 0, 0.1);
+}
